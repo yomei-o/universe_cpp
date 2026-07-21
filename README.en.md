@@ -2,7 +2,7 @@
 
 [日本語](README.md) | **English**
 
-21 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
+24 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
 
 The original JavaScript versions live at [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe).
 
@@ -33,6 +33,9 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 | 🌠 | [Graviton spiral](https://yomei-o.github.io/universe_wasm/graviton_spiral_os/) | Gravitons emitted in a spiral from a binary |
 | 💧 | [H₂O vibration](https://yomei-o.github.io/universe_wasm/water_vibration_os/) | The three normal vibrational modes of water |
 | ⏱️ | [Time dilation](https://yomei-o.github.io/universe_wasm/time_dilation_os/) | Twin paradox — the fast twin's clock runs slow |
+| 🌿 | [Photosynthesis](https://yomei-o.github.io/universe_wasm/photosynthesis_os/) | Quantum-coherent transport funnelled to a reaction centre |
+| 🌀 | [Chemical spiral](https://yomei-o.github.io/universe_wasm/spiral_os/) | Barkley reaction–diffusion rotating spiral (click to inject) |
+| 🧊 | [Open superconductor](https://yomei-o.github.io/universe_wasm/superconductor_os/) | Cooper-pair transport; heat breaks pairs and raises resistance |
 
 ## 💡 Architecture
 

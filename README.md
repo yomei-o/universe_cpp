@@ -2,7 +2,7 @@
 
 **日本語** | [English](README.en.md)
 
-21 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
+24 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
 JavaScript はブラウザに必須の部分（ピクセルバッファの canvas への転送・UI イベント）だけを担当します。描画には単一ヘッダの 2D グラフィックスライブラリ [olive.c](https://github.com/tsoding/olive.c)（MIT）を使い、C++ 側が RGBA フレームバッファへ直接描いています。
 
 元になった JavaScript 版は [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe) にあります。
@@ -34,6 +34,9 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🌠 | [グラビトン放出](https://yomei-o.github.io/universe_wasm/graviton_spiral_os/) | 連星から螺旋状に放出される重力子 |
 | 💧 | [水分子振動](https://yomei-o.github.io/universe_wasm/water_vibration_os/) | H₂O の 3 基準振動モード |
 | ⏱️ | [時間遅延・双子](https://yomei-o.github.io/universe_wasm/time_dilation_os/) | 高速移動する双子の時計の遅れ |
+| 🌿 | [光合成・量子輸送](https://yomei-o.github.io/universe_wasm/photosynthesis_os/) | 導波路を低損失で伝わり反応中心へ集約する波 |
+| 🌀 | [化学スパイラル](https://yomei-o.github.io/universe_wasm/spiral_os/) | Barkley 反応拡散の回転スパイラル（クリックで注入） |
+| 🧊 | [開放系超伝導](https://yomei-o.github.io/universe_wasm/superconductor_os/) | クーパー対の輸送・温度で対が壊れ抵抗が出る |
 
 ## 💡 構成
 
