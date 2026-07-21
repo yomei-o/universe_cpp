@@ -65,6 +65,7 @@ KEEP void sim_action(int){}
 // pointer down/move: grab nearest quark within 25px then drag it to cursor
 KEEP void sim_click(double nx,double ny){
     double mx=nx*FW, my=ny*FH;
+    if(mx<0)mx=0; if(mx>FW)mx=FW; if(my<0)my=0; if(my>FH)my=FH;  // keep the dragged quark on-canvas
     g_since=0;
     if(g_grab<0){
         for(size_t i=0;i<quarks.size();++i){
@@ -110,12 +111,19 @@ KEEP void sim_step(int steps){
             }
         }
 
-        // integrate + wall bounce
+        // integrate + wall bounce.
+        // The confinement spring stiffens as dist^2, so hard yanks can blow the
+        // velocity/position up to huge values; feeding those into the line
+        // rasteriser makes it walk billions of pixels and freezes the browser.
+        // Clamp speed AND clamp the position back inside the canvas to stay bounded.
+        const double VMAX=45.0;
         for(auto &q:quarks){
             if(!q.dragging){
+                double sp=std::sqrt(q.vx*q.vx+q.vy*q.vy);
+                if(!(sp<VMAX)){ if(sp>1e-9){ q.vx=q.vx/sp*VMAX; q.vy=q.vy/sp*VMAX; } else { q.vx=q.vy=0; } }
                 q.x+=q.vx; q.y+=q.vy; q.vx*=0.95; q.vy*=0.95;
-                if(q.x<20||q.x>FW-20) q.vx*=-1;
-                if(q.y<20||q.y>FH-20) q.vy*=-1;
+                if(q.x<20){ q.x=20; q.vx=-q.vx; } else if(q.x>FW-20){ q.x=FW-20; q.vx=-q.vx; }
+                if(q.y<20){ q.y=20; q.vy=-q.vy; } else if(q.y>FH-20){ q.y=FH-20; q.vy=-q.vy; }
             }
         }
     }
