@@ -8,34 +8,34 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 
 ## 🎮 Live demos
 
-**[▶ Gallery (all demos)](https://yomei-o.github.io/universe_wasm/)**
+**[▶ Gallery (all demos)](https://yomei-o.github.io/universe_cpp/wasmdist/)**
 
 | # | Demo | What it shows |
 |---|------|---------------|
-| 🌌 | [Gravity waves](https://yomei-o.github.io/universe_wasm/gravity_wave/) | Rotating binary (quadrupole) radiating spacetime waves; absorbing boundary |
-| 💥 | [Annihilation](https://yomei-o.github.io/universe_wasm/annihilation_os/) | Matter/antimatter annihilation into an energy wave |
-| 🌊 | [Double slit](https://yomei-o.github.io/universe_wasm/doubleslit_os/) | Interference fringes collapsing under observation |
-| 🔗 | [Entanglement](https://yomei-o.github.io/universe_wasm/entanglement_os/) | Anti-phase pair; measuring one fixes both spins |
-| 🚧 | [Tunneling](https://yomei-o.github.io/universe_wasm/tunneling_os_v4_1/) | Wave packet through a barrier; transmission counter |
-| 🕳️ | [Wormhole](https://yomei-o.github.io/universe_wasm/wormhole_os/) | Amplitude transfer linking two isolated regions |
-| ⚛️ | [Wave–particle](https://yomei-o.github.io/universe_wasm/wave_particle_os/) | Wave interference vs. probabilistic particle dots |
-| 🧲 | [Superconductivity](https://yomei-o.github.io/universe_wasm/superconductivity_os/) | Zero resistance + Meissner field expulsion on cooling |
-| ⭐ | [Planck star](https://yomei-o.github.io/universe_wasm/planck_star_os/) | Gravitational collapse with a singularity-avoiding bounce |
-| 🎆 | [Inflation](https://yomei-o.github.io/universe_wasm/inflation_os/) | Exponential stretch of quantum noise, freezing into CMB |
-| ☢️ | [Neutron decay](https://yomei-o.github.io/universe_wasm/neutron_decay_os/) | Beta decay (wave mode / particle mode) |
-| 🕸️ | [Spacetime mesh](https://yomei-o.github.io/universe_wasm/universe_os/) | Click a black hole to warp the lattice |
-| 📐 | [Casimir effect](https://yomei-o.github.io/universe_wasm/casimir_vacuum_os/) | Vacuum-fluctuation pressure difference moving plates |
-| 🌫️ | [Electron cloud](https://yomei-o.github.io/universe_wasm/electron_os/) | Electron orbitals; click to add a nucleus (covalent) |
-| ⚡ | [Weak interaction](https://yomei-o.github.io/universe_wasm/weak_os/) | Neutron → proton + electron (beta decay) |
-| ♾️ | [Three-body](https://yomei-o.github.io/universe_wasm/three_body_chaos_working/) | Figure-8 choreography and chaos (error injection) |
-| 🎗️ | [Quark confinement](https://yomei-o.github.io/universe_wasm/quark_os/) | Distance-stiffening strong force; string snap = pair production |
-| 🌀 | [Dark matter](https://yomei-o.github.io/universe_wasm/dark_matter_os/) | Galaxy rotation curve (Keplerian vs flat) |
-| 🌠 | [Graviton spiral](https://yomei-o.github.io/universe_wasm/graviton_spiral_os/) | Gravitons emitted in a spiral from a binary |
-| 💧 | [H₂O vibration](https://yomei-o.github.io/universe_wasm/water_vibration_os/) | The three normal vibrational modes of water |
-| ⏱️ | [Time dilation](https://yomei-o.github.io/universe_wasm/time_dilation_os/) | Twin paradox — the fast twin's clock runs slow |
-| 🌿 | [Photosynthesis](https://yomei-o.github.io/universe_wasm/photosynthesis_os/) | Quantum-coherent transport funnelled to a reaction centre |
-| 🌀 | [Chemical spiral](https://yomei-o.github.io/universe_wasm/spiral_os/) | Barkley reaction–diffusion rotating spiral (click to inject) |
-| 🧊 | [Open superconductor](https://yomei-o.github.io/universe_wasm/superconductor_os/) | Cooper-pair transport; heat breaks pairs and raises resistance |
+| 🌌 | [Gravity waves](https://yomei-o.github.io/universe_cpp/wasmdist/gravity_wave/) | Rotating binary (quadrupole) radiating spacetime waves; absorbing boundary |
+| 💥 | [Annihilation](https://yomei-o.github.io/universe_cpp/wasmdist/annihilation_os/) | Matter/antimatter annihilation into an energy wave |
+| 🌊 | [Double slit](https://yomei-o.github.io/universe_cpp/wasmdist/doubleslit_os/) | Interference fringes collapsing under observation |
+| 🔗 | [Entanglement](https://yomei-o.github.io/universe_cpp/wasmdist/entanglement_os/) | Anti-phase pair; measuring one fixes both spins |
+| 🚧 | [Tunneling](https://yomei-o.github.io/universe_cpp/wasmdist/tunneling_os_v4_1/) | Wave packet through a barrier; transmission counter |
+| 🕳️ | [Wormhole](https://yomei-o.github.io/universe_cpp/wasmdist/wormhole_os/) | Amplitude transfer linking two isolated regions |
+| ⚛️ | [Wave–particle](https://yomei-o.github.io/universe_cpp/wasmdist/wave_particle_os/) | Wave interference vs. probabilistic particle dots |
+| 🧲 | [Superconductivity](https://yomei-o.github.io/universe_cpp/wasmdist/superconductivity_os/) | Zero resistance + Meissner field expulsion on cooling |
+| ⭐ | [Planck star](https://yomei-o.github.io/universe_cpp/wasmdist/planck_star_os/) | Gravitational collapse with a singularity-avoiding bounce |
+| 🎆 | [Inflation](https://yomei-o.github.io/universe_cpp/wasmdist/inflation_os/) | Exponential stretch of quantum noise, freezing into CMB |
+| ☢️ | [Neutron decay](https://yomei-o.github.io/universe_cpp/wasmdist/neutron_decay_os/) | Beta decay (wave mode / particle mode) |
+| 🕸️ | [Spacetime mesh](https://yomei-o.github.io/universe_cpp/wasmdist/universe_os/) | Click a black hole to warp the lattice |
+| 📐 | [Casimir effect](https://yomei-o.github.io/universe_cpp/wasmdist/casimir_vacuum_os/) | Vacuum-fluctuation pressure difference moving plates |
+| 🌫️ | [Electron cloud](https://yomei-o.github.io/universe_cpp/wasmdist/electron_os/) | Electron orbitals; click to add a nucleus (covalent) |
+| ⚡ | [Weak interaction](https://yomei-o.github.io/universe_cpp/wasmdist/weak_os/) | Neutron → proton + electron (beta decay) |
+| ♾️ | [Three-body](https://yomei-o.github.io/universe_cpp/wasmdist/three_body_chaos_working/) | Figure-8 choreography and chaos (error injection) |
+| 🎗️ | [Quark confinement](https://yomei-o.github.io/universe_cpp/wasmdist/quark_os/) | Distance-stiffening strong force; string snap = pair production |
+| 🌀 | [Dark matter](https://yomei-o.github.io/universe_cpp/wasmdist/dark_matter_os/) | Galaxy rotation curve (Keplerian vs flat) |
+| 🌠 | [Graviton spiral](https://yomei-o.github.io/universe_cpp/wasmdist/graviton_spiral_os/) | Gravitons emitted in a spiral from a binary |
+| 💧 | [H₂O vibration](https://yomei-o.github.io/universe_cpp/wasmdist/water_vibration_os/) | The three normal vibrational modes of water |
+| ⏱️ | [Time dilation](https://yomei-o.github.io/universe_cpp/wasmdist/time_dilation_os/) | Twin paradox — the fast twin's clock runs slow |
+| 🌿 | [Photosynthesis](https://yomei-o.github.io/universe_cpp/wasmdist/photosynthesis_os/) | Quantum-coherent transport funnelled to a reaction centre |
+| 🌀 | [Chemical spiral](https://yomei-o.github.io/universe_cpp/wasmdist/spiral_os/) | Barkley reaction–diffusion rotating spiral (click to inject) |
+| 🧊 | [Open superconductor](https://yomei-o.github.io/universe_cpp/wasmdist/superconductor_os/) | Cooper-pair transport; heat breaks pairs and raises resistance |
 
 ## 💡 Architecture
 

@@ -9,34 +9,34 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 
 ## 🎮 オンラインデモ
 
-**[▶ ギャラリー（全デモ一覧）](https://yomei-o.github.io/universe_wasm/)**
+**[▶ ギャラリー（全デモ一覧）](https://yomei-o.github.io/universe_cpp/wasmdist/)**
 
 | # | デモ | 内容 |
 |---|------|------|
-| 🌌 | [重力波](https://yomei-o.github.io/universe_wasm/gravity_wave/) | 回転連星（四重極）が放つ時空の波・吸収境界 |
-| 💥 | [反物質消滅](https://yomei-o.github.io/universe_wasm/annihilation_os/) | 物質・反物質の対消滅とエネルギー波 |
-| 🌊 | [二重スリット](https://yomei-o.github.io/universe_wasm/doubleslit_os/) | 干渉縞と観測による収束 |
-| 🔗 | [量子もつれ](https://yomei-o.github.io/universe_wasm/entanglement_os/) | 反位相の対・測定でスピン確定 |
-| 🚧 | [トンネル効果](https://yomei-o.github.io/universe_wasm/tunneling_os_v4_1/) | 障壁を透過する波束・透過カウンタ |
-| 🕳️ | [ワームホール](https://yomei-o.github.io/universe_wasm/wormhole_os/) | 2 領域を直結する振幅転送 |
-| ⚛️ | [波と粒](https://yomei-o.github.io/universe_wasm/wave_particle_os/) | 波の干渉と観測での粒子ドット化 |
-| 🧲 | [超伝導・マイスナー](https://yomei-o.github.io/universe_wasm/superconductivity_os/) | 冷却で無抵抗・磁場排除 |
-| ⭐ | [プランク星](https://yomei-o.github.io/universe_wasm/planck_star_os/) | 重力崩壊と特異点回避のバウンス |
-| 🎆 | [インフレーション](https://yomei-o.github.io/universe_wasm/inflation_os/) | 量子ゆらぎの指数膨張と CMB 凍結 |
-| ☢️ | [中性子崩壊](https://yomei-o.github.io/universe_wasm/neutron_decay_os/) | β崩壊（波モード／粒子モード） |
-| 🕸️ | [時空メッシュ](https://yomei-o.github.io/universe_wasm/universe_os/) | クリックしたブラックホールで格子が歪む |
-| 📐 | [カシミール効果](https://yomei-o.github.io/universe_wasm/casimir_vacuum_os/) | 真空ゆらぎの圧力差で板が動く |
-| 🌫️ | [電子雲](https://yomei-o.github.io/universe_wasm/electron_os/) | 核に束縛された電子軌道（クリックで共有結合） |
-| ⚡ | [弱い相互作用](https://yomei-o.github.io/universe_wasm/weak_os/) | 中性子→陽子＋電子（β崩壊） |
-| ♾️ | [三体問題](https://yomei-o.github.io/universe_wasm/three_body_chaos_working/) | 8 の字周期軌道とカオス（誤差注入） |
-| 🎗️ | [クォーク閉じ込め](https://yomei-o.github.io/universe_wasm/quark_os/) | 距離で硬くなる強い力・弦の破断で対生成 |
-| 🌀 | [ダークマター](https://yomei-o.github.io/universe_wasm/dark_matter_os/) | 銀河回転曲線（ケプラー vs 平坦） |
-| 🌠 | [グラビトン放出](https://yomei-o.github.io/universe_wasm/graviton_spiral_os/) | 連星から螺旋状に放出される重力子 |
-| 💧 | [水分子振動](https://yomei-o.github.io/universe_wasm/water_vibration_os/) | H₂O の 3 基準振動モード |
-| ⏱️ | [時間遅延・双子](https://yomei-o.github.io/universe_wasm/time_dilation_os/) | 高速移動する双子の時計の遅れ |
-| 🌿 | [光合成・量子輸送](https://yomei-o.github.io/universe_wasm/photosynthesis_os/) | 導波路を低損失で伝わり反応中心へ集約する波 |
-| 🌀 | [化学スパイラル](https://yomei-o.github.io/universe_wasm/spiral_os/) | Barkley 反応拡散の回転スパイラル（クリックで注入） |
-| 🧊 | [開放系超伝導](https://yomei-o.github.io/universe_wasm/superconductor_os/) | クーパー対の輸送・温度で対が壊れ抵抗が出る |
+| 🌌 | [重力波](https://yomei-o.github.io/universe_cpp/wasmdist/gravity_wave/) | 回転連星（四重極）が放つ時空の波・吸収境界 |
+| 💥 | [反物質消滅](https://yomei-o.github.io/universe_cpp/wasmdist/annihilation_os/) | 物質・反物質の対消滅とエネルギー波 |
+| 🌊 | [二重スリット](https://yomei-o.github.io/universe_cpp/wasmdist/doubleslit_os/) | 干渉縞と観測による収束 |
+| 🔗 | [量子もつれ](https://yomei-o.github.io/universe_cpp/wasmdist/entanglement_os/) | 反位相の対・測定でスピン確定 |
+| 🚧 | [トンネル効果](https://yomei-o.github.io/universe_cpp/wasmdist/tunneling_os_v4_1/) | 障壁を透過する波束・透過カウンタ |
+| 🕳️ | [ワームホール](https://yomei-o.github.io/universe_cpp/wasmdist/wormhole_os/) | 2 領域を直結する振幅転送 |
+| ⚛️ | [波と粒](https://yomei-o.github.io/universe_cpp/wasmdist/wave_particle_os/) | 波の干渉と観測での粒子ドット化 |
+| 🧲 | [超伝導・マイスナー](https://yomei-o.github.io/universe_cpp/wasmdist/superconductivity_os/) | 冷却で無抵抗・磁場排除 |
+| ⭐ | [プランク星](https://yomei-o.github.io/universe_cpp/wasmdist/planck_star_os/) | 重力崩壊と特異点回避のバウンス |
+| 🎆 | [インフレーション](https://yomei-o.github.io/universe_cpp/wasmdist/inflation_os/) | 量子ゆらぎの指数膨張と CMB 凍結 |
+| ☢️ | [中性子崩壊](https://yomei-o.github.io/universe_cpp/wasmdist/neutron_decay_os/) | β崩壊（波モード／粒子モード） |
+| 🕸️ | [時空メッシュ](https://yomei-o.github.io/universe_cpp/wasmdist/universe_os/) | クリックしたブラックホールで格子が歪む |
+| 📐 | [カシミール効果](https://yomei-o.github.io/universe_cpp/wasmdist/casimir_vacuum_os/) | 真空ゆらぎの圧力差で板が動く |
+| 🌫️ | [電子雲](https://yomei-o.github.io/universe_cpp/wasmdist/electron_os/) | 核に束縛された電子軌道（クリックで共有結合） |
+| ⚡ | [弱い相互作用](https://yomei-o.github.io/universe_cpp/wasmdist/weak_os/) | 中性子→陽子＋電子（β崩壊） |
+| ♾️ | [三体問題](https://yomei-o.github.io/universe_cpp/wasmdist/three_body_chaos_working/) | 8 の字周期軌道とカオス（誤差注入） |
+| 🎗️ | [クォーク閉じ込め](https://yomei-o.github.io/universe_cpp/wasmdist/quark_os/) | 距離で硬くなる強い力・弦の破断で対生成 |
+| 🌀 | [ダークマター](https://yomei-o.github.io/universe_cpp/wasmdist/dark_matter_os/) | 銀河回転曲線（ケプラー vs 平坦） |
+| 🌠 | [グラビトン放出](https://yomei-o.github.io/universe_cpp/wasmdist/graviton_spiral_os/) | 連星から螺旋状に放出される重力子 |
+| 💧 | [水分子振動](https://yomei-o.github.io/universe_cpp/wasmdist/water_vibration_os/) | H₂O の 3 基準振動モード |
+| ⏱️ | [時間遅延・双子](https://yomei-o.github.io/universe_cpp/wasmdist/time_dilation_os/) | 高速移動する双子の時計の遅れ |
+| 🌿 | [光合成・量子輸送](https://yomei-o.github.io/universe_cpp/wasmdist/photosynthesis_os/) | 導波路を低損失で伝わり反応中心へ集約する波 |
+| 🌀 | [化学スパイラル](https://yomei-o.github.io/universe_cpp/wasmdist/spiral_os/) | Barkley 反応拡散の回転スパイラル（クリックで注入） |
+| 🧊 | [開放系超伝導](https://yomei-o.github.io/universe_cpp/wasmdist/superconductor_os/) | クーパー対の輸送・温度で対が壊れ抵抗が出る |
 
 ## 💡 構成
 
