@@ -230,16 +230,94 @@ static void trace_pg(double b, double Rmax, std::vector<Pt>& out, bool& cap, dou
 static double g_leps = -1.2;      // log10(b/b_crit - 1)
 static double g_view = 12.0;
 static bool dirty = true;
-static int g_mark = 0;
+
+// ----------------------------------------------------------------- animation
+// The right grid is not decoration: it is a set of freely falling shells, each
+// obeying dr/dt = -sqrt(2m/r) exactly (in PG coordinates the flow speed IS the
+// Newtonian escape speed, and PG time is the falling shell's proper time).
+// The dots are light. Radially:
+//     left   drho/dt = +-c(rho)          light speed varies, grid still
+//     right  dr/dt   = +-1 - v(r)        light speed exactly 1, grid moves
+// In-going light JAMS at the throat on the left and sails straight through on
+// the right -- that difference is pure bookkeeping. Out-going light stalls at
+// the horizon in BOTH panels -- that one is the observable.
+static const int NRING = 10;          // falling shells (the water) on the right
+static const int NDOT = 7;            // light markers per stream
+static double g_ring[NRING];
+static double inL[NDOT], inR[NDOT], outL[NDOT], outR[NDOT];
+static double g_speed = 1.0;
+
+static inline double vflow(double r) { return std::sqrt(2.0 / r); }
+static double f_ring(double r) { return -vflow(r); }
+static double f_inR(double r)  { return -1.0 - vflow(r); }
+static double f_outR(double r) { return  1.0 - vflow(r); }
+static double f_inL(double p)  { return -c_iso(p); }
+static double f_outL(double p) { return  c_iso(p); }
+
+static void adv(double& x, double h, double (*f)(double), double lo) {
+    double k1 = f(x);
+    double xm = x + 0.5 * h * k1; if (xm < lo) xm = lo;
+    double k2 = f(xm);
+    x += h * k2; if (x < lo) x = lo;
+}
+static double spawn_r() { return 0.98 * g_view; }
+
+static void anim_reset() {
+    double R = spawn_r();
+    for (int i = 0; i < NRING; ++i)                       // even spacing in time
+        g_ring[i] = R * std::pow((i + 0.5) / NRING, 2.0 / 3.0);
+    for (int i = 0; i < NDOT; ++i) {
+        double f = (i + 0.5) / NDOT;
+        inL[i]  = 0.5 + (R - 0.5) * f;
+        inR[i]  = 0.06 + (R - 0.06) * f;
+        outL[i] = 0.5 + (R - 0.5) * f;
+        outR[i] = 2.0 + (R - 2.0) * f;
+    }
+}
+static void anim_step(double h) {
+    const int NSUB = 8;
+    double hs = h / NSUB;
+    double R = spawn_r();
+    for (int s = 0; s < NSUB; ++s) {
+        for (int i = 0; i < NRING; ++i) {
+            adv(g_ring[i], hs, f_ring, 0.04);
+            if (g_ring[i] <= 0.05) g_ring[i] = R;
+        }
+        for (int i = 0; i < NDOT; ++i) {
+            adv(inL[i], hs, f_inL, 0.5);
+            if (inL[i] < 0.5008) inL[i] = R;               // jammed -> recycle
+            adv(inR[i], hs, f_inR, 0.05);
+            if (inR[i] <= 0.06) inR[i] = R;
+            adv(outL[i], hs, f_outL, 0.5);
+            if (outL[i] > R) outL[i] = 0.5008;
+            adv(outR[i], hs, f_outR, 0.05);
+            if (outR[i] > R || outR[i] <= 0.06) outR[i] = 2.0008;
+        }
+    }
+}
+// each marker gets its own radial direction, so a pile-up shows up as an arc
+// hugging the surface instead of one blob on the axis
+static inline double ang_in(int i)  { return -M_PI * (0.12 + 0.76 * i / (double)(NDOT - 1)); }
+static inline double ang_out(int i) { return  M_PI * (0.12 + 0.76 * i / (double)(NDOT - 1)); }
+
+static void disc(Olivec_Canvas oc, int cx, int cy, int rad, uint32_t col,
+                 int x0, int x1, int y0, int y1) {
+    if (cx - rad < x0 || cx + rad > x1 || cy - rad < y0 || cy + rad > y1) return;
+    olivec_circle(oc, cx, cy, rad, col);
+}
 
 extern "C" {
 
 KEEP int sim_w() { return FW; }
 KEEP int sim_h() { return FH; }
-KEEP void sim_reset() { g_leps = -1.2; g_view = 12.0; dirty = true; g_mark = 0; }
+KEEP void sim_reset() {
+    g_leps = -1.2; g_view = 12.0; g_speed = 1.0; dirty = true; anim_reset();
+}
 KEEP int sim_init(int, int) { px.assign((size_t)FW * FH, 0); solve_both(); sim_reset(); return 1; }
 KEEP void sim_set(int id, double v) {
-    if (id == 0) { g_leps = v; dirty = true; } else if (id == 1) g_view = v;
+    if (id == 0) { g_leps = v; dirty = true; }
+    else if (id == 1) g_view = v;
+    else if (id == 2) g_speed = v;
 }
 KEEP void sim_action(int a) {
     const double E[4] = { 3.094717e-2, 5.409356e-5, 1.009951e-7, 1.885839e-10 };
@@ -258,9 +336,10 @@ KEEP void sim_step(int steps) {
         double b = B_ISO * (1.0 + std::pow(10.0, g_leps));
         trace_iso(b, 6.0 * g_view + 40.0, pathL, capL, thL);
         trace_pg(b, 6.0 * g_view + 40.0, pathR, capR, thR);
-        dirty = false; g_mark = 0;
+        dirty = false;
     }
-    g_mark += 5 * (steps > 0 ? steps : 1);
+    int n = steps > 0 ? steps : 1;
+    anim_step(0.11 * g_speed * n);
 }
 
 KEEP uint8_t* sim_render() {
@@ -302,6 +381,21 @@ KEEP uint8_t* sim_render() {
             if (ay < TOP || ay > BOT || by < TOP || by > BOT) continue;
             olivec_line(oc, ax, ay, bx, by, rc);
         }
+        for (int i = 0; i < NDOT; ++i) {                 // radial light, speed c(rho)
+            double a = ang_in(i), o = ang_out(i);
+            disc(oc, (int)(cx + inL[i] * SC * std::cos(a)), (int)(CY - inL[i] * SC * std::sin(a)),
+                 3, rgba(120, 255, 235, 1.f), x0, x1, TOP, BOT);
+            disc(oc, (int)(cx + outL[i] * SC * std::cos(o)), (int)(CY - outL[i] * SC * std::sin(o)),
+                 3, rgba(255, 195, 70, 1.f), x0, x1, TOP, BOT);
+        }
+        olivec_text(oc, "nothing here moves but the light. the mesh is fixed and",
+                    x0 + 10, BOT - 48, ft, 1, rgba(90, 150, 150, 1.f));
+        olivec_text(oc, "light speed varies with place, hitting 0 at the throat.",
+                    x0 + 10, BOT - 36, ft, 1, rgba(90, 150, 150, 1.f));
+        olivec_text(oc, "in going light. it never reaches the throat.",
+                    x0 + 10, BOT - 24, ft, 1, rgba(110, 220, 205, 1.f));
+        olivec_text(oc, "out going light. it crawls, then escapes.",
+                    x0 + 10, BOT - 12, ft, 1, rgba(220, 175, 70, 1.f));
     }
     // ---- right half : flowing grid, constant c ----
     {
@@ -311,10 +405,17 @@ KEEP uint8_t* sim_render() {
             int a = (int)(cx + g * SC); if (a > x0 && a < x1) olivec_line(oc, a, TOP, a, BOT, g1);
             int b = (int)(CY - g * SC); if (b > TOP && b < BOT) olivec_line(oc, x0, b, x1, b, g1);
         }
-        for (int k = 1; k <= 8; ++k) {                       // equal-flow rings
-            double frac = 0.1 * k;                           // v = frac  ->  r = 2m/frac^2
-            double r = 2.0 / (frac * frac);
-            if (r < 60.0) ring(oc, cx, CY, (int)(r * SC), rgba(0, 56, 74, 1.f), x0, x1, TOP, BOT);
+        for (int k = 0; k < 12; ++k) {                       // static spokes: flow is radial
+            double a = k * (M_PI / 6.0);
+            int ex = (int)(cx + 60.0 * SC * std::cos(a)), ey = (int)(CY - 60.0 * SC * std::sin(a));
+            if (ex < x0) ex = x0; if (ex > x1) ex = x1;
+            if (ey < TOP) ey = TOP; if (ey > BOT) ey = BOT;
+            olivec_line(oc, cx, CY, ex, ey, rgba(0, 44, 54, 1.f));
+        }
+        for (int i = 0; i < NRING; ++i) {          // the water, actually falling
+            double v = vflow(g_ring[i]); if (v > 1.0) v = 1.0;
+            int gg = (int)(46 + 92 * v), bb = (int)(88 + 92 * v);   // brightness = flow speed
+            ring(oc, cx, CY, (int)(g_ring[i] * SC), rgba(16, gg, bb, 1.f), x0, x1, TOP, BOT);
         }
         ring(oc, cx, CY, (int)(B_PG * SC), rgba(150, 80, 190, 1.f), x0, x1, TOP, BOT);
         ring(oc, cx, CY, (int)(R_PG * SC), rgba(230, 180, 55, 1.f), x0, x1, TOP, BOT);
@@ -328,6 +429,21 @@ KEEP uint8_t* sim_render() {
             if (ay < TOP || ay > BOT || by < TOP || by > BOT) continue;
             olivec_line(oc, ax, ay, bx, by, rc);
         }
+        for (int i = 0; i < NDOT; ++i) {                  // radial light, speed exactly 1
+            double a = ang_in(i), o = ang_out(i);
+            disc(oc, (int)(cx + inR[i] * SC * std::cos(a)), (int)(CY - inR[i] * SC * std::sin(a)),
+                 3, rgba(120, 255, 235, 1.f), x0, x1, TOP, BOT);
+            disc(oc, (int)(cx + outR[i] * SC * std::cos(o)), (int)(CY - outR[i] * SC * std::sin(o)),
+                 3, rgba(255, 195, 70, 1.f), x0, x1, TOP, BOT);
+        }
+        olivec_text(oc, "square mesh is a fixed flat ruler. round rings are the water,",
+                    x0 + 10, BOT - 48, ft, 1, rgba(90, 150, 170, 1.f));
+        olivec_text(oc, "falling in at sqrt 2m over r. brighter ring, faster water.",
+                    x0 + 10, BOT - 36, ft, 1, rgba(90, 150, 170, 1.f));
+        olivec_text(oc, "in going light sails straight through r 2m.",
+                    x0 + 10, BOT - 24, ft, 1, rgba(110, 220, 205, 1.f));
+        olivec_text(oc, "out going light stalls exactly at r 2m.",
+                    x0 + 10, BOT - 12, ft, 1, rgba(220, 175, 70, 1.f));
     }
 
     // ---- HUD ----
@@ -371,6 +487,61 @@ int main(int argc, char** argv) {
     sim_step(steps);
     printf("at ring 1: deflection left %.6f rad, right %.6f rad, target pi = %.6f\n",
            std::fabs(thL) - M_PI, thR, M_PI);
+    // ---- the animation, checked numerically ----
+    // In-going radial light, released at areal radius 8m in BOTH charts.
+    // rho with areal(rho) = 8:  rho + m + m^2/4rho = 8  ->  rho = (7 + sqrt48)/2
+    double pL = 0.5 * (7.0 + std::sqrt(48.0)), rR = 8.0;
+    double t = 0.0, tcross = -1.0, tend = -1.0, e10 = 0.0, e40 = 0.0;
+    printf("\nin going radial light, released at areal radius 8m in both charts\n");
+    printf("  static grid starts at rho = %.9f, areal %.9f\n", pL, areal(pL));
+    while (t < 40.0 - 1e-9) {
+        adv(pL, 0.001, f_inL, 0.5);
+        adv(rR, 0.001, f_inR, 0.05);
+        t += 0.001;
+        if (tcross < 0.0 && rR < 2.0) tcross = t;
+        if (tend < 0.0 && rR <= 0.0501) tend = t;
+        if (std::fabs(t - 25.0) < 5e-4) { e10 = pL - 0.5;
+            printf("  t 25.0 m/c   static rho minus 0.5 = %.4e   areal minus 2m = %.3e\n",
+                   e10, areal(pL) - 2.0); }
+    }
+    e40 = pL - 0.5;
+    printf("  t 40.0 m/c   static rho minus 0.5 = %.4e   areal minus 2m = %.3e\n",
+           e40, areal(pL) - 2.0);
+    printf("  the static chart approaches the throat as exp minus t over tau,"
+           " measured tau = %.6f m/c, exact is 4\n", 15.0 / std::log(e10 / e40));
+    printf("  and the areal radius follows as the square of that,"
+           " because rho m over 2 is its minimum\n");
+    printf("  so t never labels a crossing there. the flowing chart crosses r 2m"
+           " at t = %.4f m/c\n", tcross);
+    printf("  and reaches r 0.05m at t = %.4f m/c. nothing special happens at 2m for it.\n", tend);
+    printf("  that disagreement is about the label t, not about the light."
+           " nothing comes back either way.\n");
+    // The moving rings on the right are real free fall, not a fudge: for
+     // dr/dt = -sqrt(2m/r), r^(3/2) is exactly linear in t.
+    double rs = 10.0, t2 = 0.0;
+    while (t2 < 6.0 - 1e-9) { adv(rs, 0.001, f_ring, 0.04); t2 += 0.001; }
+    double ex = std::pow(std::pow(10.0, 1.5) - 1.5 * std::sqrt(2.0) * 6.0, 2.0 / 3.0);
+    printf("falling shell released at rest at r 10m, after t = 6 m/c\n");
+    printf("  integrator %.9f m   exact %.9f m   diff %.2e\n", rs, ex, std::fabs(rs - ex));
+    // Out-going radial light: where does the chart say its speed is zero?
+    double sL = 0.5, sR = 2.0;
+    printf("out going radial light stalls where its coordinate speed hits 0\n");
+    printf("  static grid   c(rho) = %.3e at rho %.6f, areal radius %.9f m\n",
+           c_iso(sL + 1e-15), sL, areal(sL));
+    printf("  flowing grid  1 minus v(r) = %.3e at r = %.9f m\n", 1.0 - vflow(sR), sR);
+    printf("  same surface. one because c ran out, one because the river won.\n");
+    // and the frame loop really moves them
+    for (int i = 0; i < 120; ++i) sim_step(1);
+    printf("shell radii at frame 120:");
+    for (int i = 0; i < NRING; ++i) printf(" %.2f", g_ring[i]);
+    printf("\nin going light  at frame 120:");
+    for (int i = 0; i < NDOT; ++i) printf("  l %.3f r %.3f", inL[i], inR[i]);
+    for (int i = 0; i < 60; ++i) sim_step(1);
+    printf("\nshell radii at frame 180:");
+    for (int i = 0; i < NRING; ++i) printf(" %.2f", g_ring[i]);
+    printf("\nin going light  at frame 180:");
+    for (int i = 0; i < NDOT; ++i) printf("  l %.3f r %.3f", inL[i], inR[i]);
+    printf("\n");
     uint8_t* p = sim_render();
     stbi_write_png("twogrid_os_preview.png", FW, FH, 4, p, FW * 4);
     printf("wrote twogrid_os_preview.png\n");

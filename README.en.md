@@ -40,7 +40,7 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 | 🌀 | [Flat grid, photon ring](https://yomei-o.github.io/universe_cpp/wasmdist/flatgrid_os/) | The lattice never bends; the light speed does. Shadow is min rho over c = sqrt27 m |
 | 🌊 | [River model](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | Space is exactly euclidean; the horizon is where the river reaches c |
 | 🌞 | [Photon sphere](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | Light can circle but the orbit is unstable: error grows 535.49x per turn |
-| 🪞 | [Two grids, one shadow](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | Static grid vs flowing grid side by side: different coordinates, same shadow to 13 digits |
+| 🪞 | [Two grids, one shadow](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | A grid that never moves vs water that actually falls: different coordinates, same shadow to 13 digits |
 
 ## 💡 Architecture
 

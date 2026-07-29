@@ -41,7 +41,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🌀 | [平坦な格子と光子リング](https://yomei-o.github.io/universe_cpp/wasmdist/flatgrid_os/) | 格子は歪まず、場所で光速が変わる。影は min ρ/c ＝√27 m |
 | 🌊 | [川のモデル](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | 空間は厳密にユークリッド。川が光速に達する面が地平面 |
 | 🌞 | [光子球](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | 光が円を描けるが不安定。1周ごとに誤差が 535.49 倍 |
-| 🪞 | [2つの格子・1つの影](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | 静止格子と流れる格子を並べる。座標は別物でも影は 13 桁一致 |
+| 🪞 | [2つの格子・1つの影](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | 動かない格子と落ちてくる水を並べる。座標は別物でも影は 13 桁一致 |
 
 ## 💡 構成
 
