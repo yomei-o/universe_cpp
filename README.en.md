@@ -2,7 +2,7 @@
 
 [日本語](README.md) | **English**
 
-31 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
+32 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
 
 The original JavaScript versions live at [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe).
 
@@ -41,6 +41,7 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 | 🌊 | [River model](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | Space is exactly euclidean; the horizon is where the river reaches c |
 | 🌞 | [Photon sphere](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | Light can circle but the orbit is unstable: error grows 535.49x per turn |
 | 🪞 | [Two grids, one shadow](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | A grid that never moves vs water that actually falls: different coordinates, same shadow to 13 digits |
+| 📡 | [Radar on the AMR machine](https://yomei-o.github.io/universe_cpp/wasmdist/radaramr_os/) | Same physics, different grid hierarchy per chart: 8 levels for pg, 6 for iso, and the observable agrees to 12 digits |
 | 🧱 | [AMR, how nr computes](https://yomei-o.github.io/universe_cpp/wasmdist/amr_os/) | Berger-Oliger levels with subcycling in time; the equation is only a wave but the machinery is the real thing, converging at 4th order |
 | 📡 | [Radar, two charts one answer](https://yomei-o.github.io/universe_cpp/wasmdist/radar_os/) | The 3+1 bookkeeping vs c·t=const on one experiment: apart by 14.9 on the turnaround, 5e-13 on the round trip (fixed background, not an Einstein solver) |
 

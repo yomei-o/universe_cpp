@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universe OS - Radar on the AMR machine (C++/WASM)</title>
+<style>
+  :root{ --fg:#00ffcc; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:#020206; color:var(--fg); font-family:'Courier New',monospace;
+        min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  h1{ font-size:16px; margin:0; font-weight:700; }
+  .sub{ font-size:12px; color:#5fbfa8; max-width:880px; text-align:center; line-height:1.6; }
+  canvas{ width:min(96vw,900px); height:auto; image-rendering:pixelated; background:#020206;
+          border:1px solid #0a3; border-radius:6px; box-shadow:0 6px 26px #000a; }
+  #panel{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:center; max-width:900px; }
+  .ctl{ display:flex; flex-direction:column; font-size:11px; color:#5fbfa8; min-width:150px; }
+  .ctl b{ color:var(--fg); }
+  input[type=range]{ accent-color:var(--fg); }
+  button{ font-family:inherit; font-size:13px; padding:7px 13px; border:1px solid #0a5; border-radius:6px;
+          background:#062018; color:var(--fg); cursor:pointer; }
+  button:hover{ background:#0a3324; }
+  button.primary{ background:var(--fg); color:#05130f; border:none; font-weight:700; }
+  #status{ font-size:12px; color:#5fbfa8; font-variant-numeric:tabular-nums; min-height:1.2em; }
+  a{ color:var(--fg); }
+  table{ border-collapse:collapse; font-size:11px; color:#5fbfa8; }
+  td,th{ border:1px solid #0a3; padding:4px 9px; text-align:left; }
+  th{ color:var(--fg); }
+  td.n{ text-align:right; font-variant-numeric:tabular-nums; }
+</style>
+</head>
+<body>
+  <h1>📡🧱 Radar on the AMR machine <span style="color:#5fbfa8;font-size:12px">(C++ / WASM)</span></h1>
+
+  <p class="sub"><a href="../radar_os/">radar_os</a> のレーダー往復を、<a href="../amr_os/">amr_os</a> の
+  Berger–Oliger の機械に載せたものです。同じシュワルツシルト時空を 2 つの座標で書き、
+  それぞれが<b>自分専用の格子階層</b>を持って、同じ実験の時間を測ります。</p>
+
+  <p class="sub"><b>ここで細かい格子が必要な理由は、パルスの居場所ではありません。穴の居場所です。</b>
+  外向きの座標光速が地平面近くで潰れるので、鏡を地平面すぐ外（面積半径 2.05m）に置くと、
+  外向きパルスが空間的に押し潰されます：</p>
+  <table>
+    <tr><th></th><th>外向き光速の式</th><th>皿（50m）で</th><th>鏡（2.05m）で</th><th>潰れ</th><th>必要なレベル</th></tr>
+    <tr><td>pg</td><td>1 − √(2m/r)</td><td class="n">0.800</td><td class="n">0.0123</td>
+        <td class="n"><b>65.2 倍</b></td><td class="n"><b>8</b></td></tr>
+    <tr><td>iso</td><td>(1−u)/(1+u)³</td><td class="n">0.960</td><td class="n">0.0522</td>
+        <td class="n"><b>18.4 倍</b></td><td class="n"><b>6</b></td></tr>
+  </table>
+  <p class="sub">穴は動かないので<b>箱も動きません</b> ―― 単独の静止ブラックホールに対して実際の計算がやる
+  <b>固定メッシュ細分化</b>です。箱を動かす機械は <a href="../amr_os/">amr_os</a> の方にあります。<br>
+  グラフの横軸は <b>log₁₀(r − 2m)</b> です。線形軸だと細分化領域が幅の 1% 未満になって何も見えないので。
+  この軸だと幾何的な入れ子がちょうど等間隔に並びます。</p>
+
+  <canvas id="cv"></canvas>
+  <div id="panel"></div>
+  <div id="status">読み込み中…</div>
+
+  <p class="sub"><b>正解は閉じた形で分かっています。</b>往復時間は
+  2[(r₁−r₂) + 4m·ln((r₁−2m)/(r₂−2m))] = <b>123.367733137848</b>、
+  そして各座標が自分の変数で積分した値がどちらもこれと 10⁻¹² で一致します
+  （被積分関数は 1 つも共有していません）。</p>
+
+  <p class="sub"><b>グリッドで解いた側も、両方 4 次で収束します。</b>
+  subcycling も prolongation も restriction も全部入ったままで、基準解像度を上げると：</p>
+  <table>
+    <tr><th>基準点数</th><th>pg の誤差</th><th>iso の誤差</th><th>比（理論）</th></tr>
+    <tr><td class="n">150</td><td class="n">1.23×10⁻²</td><td class="n">2.17×10⁻²</td><td></td></tr>
+    <tr><td class="n">250</td><td class="n">1.02×10⁻²</td><td class="n">3.03×10⁻³</td><td class="n">7.2（7.7）</td></tr>
+    <tr><td class="n">400</td><td class="n">1.63×10⁻³</td><td class="n">—</td><td class="n">6.3（6.6）</td></tr>
+  </table>
+
+  <p class="sub"><b>そして、これがこのデモの本題です。</b>
+  同じ物理・同じ観測量なのに、<b>必要な格子階層が座標で違います</b> ――
+  pg は 8 レベル、iso は 6 レベル。AMR が節約する仕事量も
+  <b>pg 63.8 倍 / iso 16.1 倍</b>で、一様格子の必要点数は pg 24006 点に対し iso 5993 点。<br>
+  つまりこの問題では <b>c·t = const の座標の方が 4 倍安い</b>。
+  ただし<b>これは法則ではありません</b> ―― この鏡の位置・この観測量での話で、
+  鏡を 6m に動かせば差はほとんど消えます（ボタンで試せます）。
+  観測量は 12 桁同じままで、変わるのは<b>計算の値段だけ</b>です。</p>
+
+  <p class="sub">「c·t=const は何も言わない。ただ計算がたまに楽になるだけ」 ―― その「たまに楽になる」を、
+  測れる数にしたのがこの画面です。</p>
+
+  <p class="sub">ソース: <a href="https://github.com/yomei-o/universe_cpp">github.com/yomei-o/universe_cpp</a></p>
+
+<script src="sim.js"></script>
+<script>
+"use strict";
+// ---- per-sim config (only this block differs between sims) ----
+const CONFIG = {
+  sliders: [
+    { id:0, label:"鏡の面積半径 m", min:2.02, max:12, step:0.01, val:2.05, dec:2 },
+    { id:1, label:"皿の面積半径 m", min:30, max:60, step:1, val:50, dec:0 },
+    { id:4, label:"基準点数（上げると遅い）", min:100, max:400, step:10, val:150, dec:0 },
+    { id:2, label:"レベルを追加", min:0, max:3, step:1, val:0, dec:0 },
+    { id:3, label:"時間の進み", min:1, max:6, step:1, val:1, dec:0 },
+  ],
+  buttons: [
+    { action:0, label:"鏡を地平面すぐ外に（2.05m）" },
+    { action:1, label:"鏡を光子球に（3m）" },
+    { action:2, label:"鏡を 6m に（差が消える）" },
+    { action:4, label:"最初から" },
+  ],
+  clickable: false,
+  stepsPerFrame: 1,
+};
+
+// ---- generic harness (identical across all Universe OS sims) ----
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d"), panel=$("panel"), statusEl=$("status");
+let M=null, api={}, W=0, H=0, img=null, playing=true, raf=0, frames=0, lastT=0;
+
+createSim().then(mod=>{
+  M=mod;
+  api.init  =M.cwrap("sim_init","number",["number","number"]);
+  api.w     =M.cwrap("sim_w","number",[]);
+  api.h     =M.cwrap("sim_h","number",[]);
+  api.reset =M.cwrap("sim_reset",null,[]);
+  api.step  =M.cwrap("sim_step",null,["number"]);
+  api.render=M.cwrap("sim_render","number",[]);
+  api.click =M.cwrap("sim_click",null,["number","number"]);
+  api.set   =M.cwrap("sim_set",null,["number","number"]);
+  api.action=M.cwrap("sim_action",null,["number"]);
+  api.init(0,0);
+  W=api.w(); H=api.h(); cv.width=W; cv.height=H; img=ctx.createImageData(W,H);
+  buildPanel();
+  CONFIG.sliders.forEach(s=>api.set(s.id, s.val));   // push initial params
+  loop();
+});
+
+function buildPanel(){
+  CONFIG.sliders.forEach(s=>{
+    const wrap=document.createElement("label"); wrap.className="ctl";
+    const head=document.createElement("span"); head.innerHTML=`${s.label} <b id="v${s.id}">${(+s.val).toFixed(s.dec)}</b>`;
+    const inp=document.createElement("input"); inp.type="range";
+    inp.min=s.min; inp.max=s.max; inp.step=s.step; inp.value=s.val;
+    inp.addEventListener("input",()=>{ $("v"+s.id).textContent=(+inp.value).toFixed(s.dec); if(M)api.set(s.id,+inp.value); });
+    wrap.appendChild(head); wrap.appendChild(inp); panel.appendChild(wrap);
+  });
+  CONFIG.buttons.forEach(b=>{
+    const btn=document.createElement("button"); btn.textContent=b.label;
+    btn.addEventListener("click",()=>{ if(M){api.action(b.action); frames=0;} });
+    panel.appendChild(btn);
+  });
+  const pp=document.createElement("button"); pp.className="primary"; pp.textContent="⏸ 一時停止";
+  pp.addEventListener("click",()=>{ playing=!playing; pp.textContent=playing?"⏸ 一時停止":"▶ 再生"; if(playing){lastT=0;loop();} });
+  panel.appendChild(pp);
+  const rs=document.createElement("button"); rs.textContent="⟲ リセット";
+  rs.addEventListener("click",()=>{ if(M){api.reset(); frames=0; if(!playing){api.step(0);blit();}} });
+  panel.appendChild(rs);
+}
+
+function blit(){ const p=api.render(); img.data.set(M.HEAPU8.subarray(p,p+W*H*4)); ctx.putImageData(img,0,0); }
+function loop(ts){
+  if(!playing) return;
+  api.step(CONFIG.stepsPerFrame); blit(); frames++;
+  let fps=0; if(lastT) fps=1000/(ts-lastT); lastT=ts;
+  statusEl.textContent=`frame ${frames}   ${fps.toFixed(0)} fps`;
+  raf=requestAnimationFrame(loop);
+}
+</script>
+</body>
+</html>
