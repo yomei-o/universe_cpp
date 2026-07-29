@@ -12,11 +12,22 @@
 //
 //   pg   (numerical relativity's usual choice: horizon penetrating)
 //        alpha = 1,  beta^r = sqrt(2m/r),  gamma_rr = 1
-//        ->  dr/dt = +-1 - sqrt(2m/r)         space flat, grid flowing
+//        ->  dr/dt = +-1 - sqrt(2m/r)         space flat, free fallers slide
+//                                             through a grid that stays put
 //
 //   iso  (the c*t = const chart: flat grid, light speed varies)
 //        alpha = (1-u)/(1+u),  beta = 0,  gamma_rr = (1+u)^4,  u = m/2rho
 //        ->  drho/dt = +- (1-u)/(1+u)^3       grid still, c varies
+//
+// The grid never falls in either of them -- a grid point is a coordinate label.
+// alpha says whether the observers normal to the slices are in free fall; beta
+// says whether the grid goes along with them. In pg, alpha = 1 means they are
+// falling (n^mu = (1, -sqrt(2m/r), 0, 0), rain from rest at infinity) and the
+// shift is there precisely so the grid does NOT follow: the radial label stays
+// the areal radius. Set beta = 0 instead and the grid really does ride the
+// free fallers -- that is geodesic slicing, and from the momentarily static
+// slice the throat reaches r = 0 at proper time exactly pi*m = 3.141592654,
+// which is the entire lifetime of such a run.
 //
 // The point of the demo is that the agreement is exactly as wide as what you
 // can measure and not one bit wider:

@@ -12,9 +12,14 @@
 //           turning point:  rho/c(rho) = b
 //           b_crit = min rho/c(rho)
 //
-//   RIGHT - flowing grid, constant light speed (Painleve-Gullstrand)
+//   RIGHT - flowing water, constant light speed (Painleve-Gullstrand)
 //           space is EXACTLY euclidean, lapse exactly 1
-//           the grid flows inward at v(r) = sqrt(2m/r), reaching c at r = 2m
+//           the WATER -- the observers normal to the slices -- falls inward at
+//           v(r) = sqrt(2m/r), reaching c at r = 2m. the grid does not move:
+//           a grid point is a coordinate label. alpha = 1 says those observers
+//           are in free fall, and the shift beta^r = v is what keeps the grid
+//           from riding along with them (drop the shift and the grid really
+//           does fall -- geodesic slicing, dead at proper time pi*m)
 //           turning point:  r/sqrt(1 - 2m/r) = b
 //           b_crit = min of that
 //
@@ -451,7 +456,7 @@ KEEP uint8_t* sim_render() {
                 14, 8, ft, 2, rgba(140, 230, 210, 1.f));
     olivec_text(oc, "left  static grid, light speed varies, c goes to 0 at rho m over 2",
                 14, 34, ft, 2, rgba(110, 200, 190, 1.f));
-    olivec_text(oc, "right flowing grid, light speed exactly c, river reaches c at r 2m",
+    olivec_text(oc, "right flowing water, light speed exactly c, river reaches c at r 2m",
                 14, 56, ft, 2, rgba(110, 180, 210, 1.f));
     std::snprintf(buf, sizeof buf, "b crit   left %.12f     right %.12f", B_ISO, B_PG);
     olivec_text(oc, buf, 14, 80, ft, 2, rgba(255, 220, 120, 1.f));
