@@ -2,7 +2,7 @@
 
 [日本語](README.md) | **English**
 
-24 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
+25 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
 
 The original JavaScript versions live at [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe).
 
@@ -36,6 +36,7 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 | 🌿 | [Photosynthesis](https://yomei-o.github.io/universe_cpp/wasmdist/photosynthesis_os/) | Quantum-coherent transport funnelled to a reaction centre |
 | 🌀 | [Chemical spiral](https://yomei-o.github.io/universe_cpp/wasmdist/spiral_os/) | Barkley reaction–diffusion rotating spiral (click to inject) |
 | 🧊 | [Open superconductor](https://yomei-o.github.io/universe_cpp/wasmdist/superconductor_os/) | Cooper-pair transport; heat breaks pairs and raises resistance |
+| ⚡ | [Gauge shock](https://yomei-o.github.io/universe_cpp/wasmdist/gaugeshock_os/) | The chart of numerical relativity tears: spacetime is fine, the characteristics cross |
 
 ## 💡 Architecture
 

@@ -2,7 +2,7 @@
 
 **日本語** | [English](README.en.md)
 
-24 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
+25 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
 JavaScript はブラウザに必須の部分（ピクセルバッファの canvas への転送・UI イベント）だけを担当します。描画には単一ヘッダの 2D グラフィックスライブラリ [olive.c](https://github.com/tsoding/olive.c)（MIT）を使い、C++ 側が RGBA フレームバッファへ直接描いています。
 
 元になった JavaScript 版は [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe) にあります。
@@ -37,6 +37,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🌿 | [光合成・量子輸送](https://yomei-o.github.io/universe_cpp/wasmdist/photosynthesis_os/) | 導波路を低損失で伝わり反応中心へ集約する波 |
 | 🌀 | [化学スパイラル](https://yomei-o.github.io/universe_cpp/wasmdist/spiral_os/) | Barkley 反応拡散の回転スパイラル（クリックで注入） |
 | 🧊 | [開放系超伝導](https://yomei-o.github.io/universe_cpp/wasmdist/superconductor_os/) | クーパー対の輸送・温度で対が壊れ抵抗が出る |
+| ⚡ | [ゲージ衝撃波](https://yomei-o.github.io/universe_cpp/wasmdist/gaugeshock_os/) | 数値相対論の座標が裂ける。時空は無傷なのに特性線が交わる |
 
 ## 💡 構成
 
@@ -78,4 +79,5 @@ for f in src/*.cpp; do ./build.sh "$(basename "$f" .cpp)"; done
 
 - 移植コードはオリジナル。物理モデルは元 JS 版（[universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe)）に忠実。
 - olive.c は MIT、stb は public domain。各ヘッダのライセンス表記を参照。
-- canvas 描画フォントは olive の内蔵フォント（ASCII）を使用するため、オーバーレイ文字は英字です（説明文は各 index.html に日本語で記載）。
+- canvas 描画フォントは olive の内蔵フォントを使用するため、オーバーレイ文字は英字です（説明文は各 index.html に日本語で記載）。
+- **olive の内蔵フォントに大文字は入っていません。** 使えるのは `a-z` `0-9` `,` `-` `.` と空白だけで、大文字・`=`・`+`・`/`・括弧は**無音で消えます**（描画されず、詰められもしない）。オーバーレイのラベルはこれに従ってください。

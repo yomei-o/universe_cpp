@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universe OS - Gauge Shock (C++/WASM)</title>
+<style>
+  :root{ --fg:#00ffcc; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:#020206; color:var(--fg); font-family:'Courier New',monospace;
+        min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  h1{ font-size:16px; margin:0; font-weight:700; }
+  .sub{ font-size:12px; color:#5fbfa8; max-width:880px; text-align:center; line-height:1.6; }
+  canvas{ width:min(96vw,900px); height:auto; image-rendering:pixelated; background:#020206;
+          border:1px solid #0a3; border-radius:6px; box-shadow:0 6px 26px #000a; cursor:crosshair; }
+  #panel{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:center; max-width:900px; }
+  .ctl{ display:flex; flex-direction:column; font-size:11px; color:#5fbfa8; min-width:150px; }
+  .ctl b{ color:var(--fg); }
+  input[type=range]{ accent-color:var(--fg); }
+  button{ font-family:inherit; font-size:13px; padding:7px 13px; border:1px solid #0a5; border-radius:6px;
+          background:#062018; color:var(--fg); cursor:pointer; }
+  button:hover{ background:#0a3324; }
+  button.primary{ background:var(--fg); color:#05130f; border:none; font-weight:700; }
+  #status{ font-size:12px; color:#5fbfa8; font-variant-numeric:tabular-nums; min-height:1.2em; }
+  a{ color:var(--fg); }
+</style>
+</head>
+<body>
+  <h1>⚡ Gauge Shock <span style="color:#5fbfa8;font-size:12px">(C++ / WASM)</span></h1>
+  <p class="sub">完璧な物理の中のバグ。数値相対論は幾何を進めるだけでなく、<b>坐標そのものを自分で選びながら</b>進む。
+  ラプス α は Bona–Massó の式 <b>∂α/∂t = −α² f(α) K</b> で進化し、その特性速度は <b>λ = α√f(α)</b>。
+  <b>伝わっている量そのものに速度が依存する</b>ので、速い部分が遅い部分を追い越し、<b>特性線が交わる</b>。
+  上：α(x) が折れて多価になる（赤）。下：特性線が1点に収束して交差する。
+  <b>時空は完全に無偉で、裂けているのは坐標だけ</b>。単純波を特性線で<b>厳密に</b>解いているので、差分スキームのせいではない。</p>
+  <canvas id="cv"></canvas>
+  <div id="panel"></div>
+  <div id="status">読み込み中…</div>
+  <p class="sub">検算済み：厳密な衝撃波時刻 t_s は harmonic 0.795775（解析解と完全一致）、1+log 1.119697、shock-avoid κ=100 で 7.850（<b>10倍遅い</b>）。
+  <br>正直な限界：この縮約模型では λ′=0 が f=κ/α² になり、Alcubierre の厳密条件 f=1+κ/α² の「+1」は出ない（2変数系から来る）。
+  3D 実機で実際に問題になるかは論争中（Reimann ら, CQG 22 (2005) 4215）。</p>
+  <p class="sub">ソース: <a href="https://github.com/yomei-o/universe_cpp">github.com/yomei-o/universe_cpp</a></p>
+
+<script src="sim.js"></script>
+<script>
+"use strict";
+// ---- per-sim config (only this block differs between sims) ----
+const CONFIG = {
+  sliders: [
+    { id:0, label:"時間の進み dt", min:0.0005, max:0.02, step:0.0005, val:0.004, dec:4 },
+    { id:1, label:"振幅 A", min:0.05, max:0.45, step:0.01, val:0.20, dec:2 },
+    { id:2, label:"kappa（shock-avoid 用）", min:0, max:200, step:1, val:10, dec:0 },
+  ],
+  buttons: [
+    { action:0, label:"harmonic  f = 1" },
+    { action:1, label:"1+log  f = 2/α（標準）" },
+    { action:2, label:"shock-avoid  f = 1 + κ/α²" },
+    { action:3, label:"t = 0 に戻す" },
+    { action:4, label:"t_shock に飛ぶ" },
+  ],
+  clickable: true,
+  stepsPerFrame: 1,
+};
+
+// ---- generic harness (identical across all Universe OS sims) ----
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d"), panel=$("panel"), statusEl=$("status");
+let M=null, api={}, W=0, H=0, img=null, playing=true, raf=0, frames=0, lastT=0;
+
+createSim().then(mod=>{
+  M=mod;
+  api.init  =M.cwrap("sim_init","number",["number","number"]);
+  api.w     =M.cwrap("sim_w","number",[]);
+  api.h     =M.cwrap("sim_h","number",[]);
+  api.reset =M.cwrap("sim_reset",null,[]);
+  api.step  =M.cwrap("sim_step",null,["number"]);
+  api.render=M.cwrap("sim_render","number",[]);
+  api.click =M.cwrap("sim_click",null,["number","number"]);
+  api.set   =M.cwrap("sim_set",null,["number","number"]);
+  api.action=M.cwrap("sim_action",null,["number"]);
+  api.init(0,0);
+  W=api.w(); H=api.h(); cv.width=W; cv.height=H; img=ctx.createImageData(W,H);
+  buildPanel();
+  CONFIG.sliders.forEach(s=>api.set(s.id, s.val));   // push initial params
+  loop();
+});
+
+function buildPanel(){
+  CONFIG.sliders.forEach(s=>{
+    const wrap=document.createElement("label"); wrap.className="ctl";
+    const head=document.createElement("span"); head.innerHTML=`${s.label} <b id="v${s.id}">${(+s.val).toFixed(s.dec)}</b>`;
+    const inp=document.createElement("input"); inp.type="range";
+    inp.min=s.min; inp.max=s.max; inp.step=s.step; inp.value=s.val;
+    inp.addEventListener("input",()=>{ $("v"+s.id).textContent=(+inp.value).toFixed(s.dec); if(M)api.set(s.id,+inp.value); });
+    wrap.appendChild(head); wrap.appendChild(inp); panel.appendChild(wrap);
+  });
+  CONFIG.buttons.forEach(b=>{
+    const btn=document.createElement("button"); btn.textContent=b.label;
+    btn.addEventListener("click",()=>{ if(M){api.action(b.action); frames=0;} });
+    panel.appendChild(btn);
+  });
+  const pp=document.createElement("button"); pp.className="primary"; pp.textContent="⏸ 一時停止";
+  pp.addEventListener("click",()=>{ playing=!playing; pp.textContent=playing?"⏸ 一時停止":"▶ 再生"; if(playing){lastT=0;loop();} });
+  panel.appendChild(pp);
+  const rs=document.createElement("button"); rs.textContent="⟲ リセット";
+  rs.addEventListener("click",()=>{ if(M){api.reset(); frames=0; if(!playing){api.step(0);blit();}} });
+  panel.appendChild(rs);
+}
+
+function blit(){ const p=api.render(); img.data.set(M.HEAPU8.subarray(p,p+W*H*4)); ctx.putImageData(img,0,0); }
+function loop(ts){
+  if(!playing) return;
+  api.step(CONFIG.stepsPerFrame); blit(); frames++;
+  let fps=0; if(lastT) fps=1000/(ts-lastT); lastT=ts;
+  statusEl.textContent=`frame ${frames}   ${fps.toFixed(0)} fps`;
+  raf=requestAnimationFrame(loop);
+}
+
+if(CONFIG.clickable){
+  const emit=e=>{ const r=cv.getBoundingClientRect();
+    api.click((e.clientX-r.left)/r.width, (e.clientY-r.top)/r.height); };
+  let down=false;
+  cv.addEventListener("pointerdown",e=>{ down=true; if(M)emit(e); });
+  cv.addEventListener("pointermove",e=>{ if(down&&M)emit(e); });
+  window.addEventListener("pointerup",()=>{ down=false; });
+}
+</script>
+</body>
+</html>
