@@ -2,7 +2,7 @@
 
 **日本語** | [English](README.en.md)
 
-26 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
+27 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
 JavaScript はブラウザに必須の部分（ピクセルバッファの canvas への転送・UI イベント）だけを担当します。描画には単一ヘッダの 2D グラフィックスライブラリ [olive.c](https://github.com/tsoding/olive.c)（MIT）を使い、C++ 側が RGBA フレームバッファへ直接描いています。
 
 元になった JavaScript 版は [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe) にあります。
@@ -39,6 +39,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🧊 | [開放系超伝導](https://yomei-o.github.io/universe_cpp/wasmdist/superconductor_os/) | クーパー対の輸送・温度で対が壊れ抵抗が出る |
 | ⚡ | [ゲージ衝撃波](https://yomei-o.github.io/universe_cpp/wasmdist/gaugeshock_os/) | 数値相対論の座標が裂ける。時空は無傷なのに特性線が交わる |
 | 🌀 | [平坦な格子と光子リング](https://yomei-o.github.io/universe_cpp/wasmdist/flatgrid_os/) | 格子は歪まず、場所で光速が変わる。影は min ρ/c ＝√27 m |
+| 🌊 | [川のモデル](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | 空間は厳密にユークリッド。川が光速に達する面が地平面 |
 
 ## 💡 構成
 
