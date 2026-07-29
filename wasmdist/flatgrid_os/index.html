@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universe OS - Flat Grid / Photon Ring (C++/WASM)</title>
+<style>
+  :root{ --fg:#00ffcc; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:#020206; color:var(--fg); font-family:'Courier New',monospace;
+        min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  h1{ font-size:16px; margin:0; font-weight:700; }
+  .sub{ font-size:12px; color:#5fbfa8; max-width:880px; text-align:center; line-height:1.6; }
+  canvas{ width:min(96vw,900px); height:auto; image-rendering:pixelated; background:#020206;
+          border:1px solid #0a3; border-radius:6px; box-shadow:0 6px 26px #000a; cursor:crosshair; }
+  #panel{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:center; max-width:900px; }
+  .ctl{ display:flex; flex-direction:column; font-size:11px; color:#5fbfa8; min-width:150px; }
+  .ctl b{ color:var(--fg); }
+  input[type=range]{ accent-color:var(--fg); }
+  button{ font-family:inherit; font-size:13px; padding:7px 13px; border:1px solid #0a5; border-radius:6px;
+          background:#062018; color:var(--fg); cursor:pointer; }
+  button:hover{ background:#0a3324; }
+  button.primary{ background:var(--fg); color:#05130f; border:none; font-weight:700; }
+  #status{ font-size:12px; color:#5fbfa8; font-variant-numeric:tabular-nums; min-height:1.2em; }
+  a{ color:var(--fg); }
+</style>
+</head>
+<body>
+  <h1>🌀 Flat Grid / Photon Ring <span style="color:#5fbfa8;font-size:12px">(C++ / WASM)</span></h1>
+  <p class="sub">背景の格子は<b>完全な直交格子で、一切歪まない</b>。変わるのは場所ごとの光の速さだけです ——
+  u = m/2ρ として <b>c(ρ) = (1−u)/(1+u)³</b>。これはシュワルツシルト解を等方座標で書いたもの。
+  光は超ハミルトニアン H = ½(−E²F + |p|²G) = 0 の正準方程式で追っています ——
+  <b>クリストフェル記号も曲率テンソルも測地線方程式も使いません</b>。<br>
+  折り返し条件が ρ/c(ρ) = b なので、影の半径は <b>b_crit = min ρ/c(ρ) = √27 m = 5.196152423 m</b>。
+  b を b_crit に近づけると曲がり角が対数発散し、曲がり角 π, 3π, 5π, … で<b>光子リング</b>が並びます。
+  隔たりは1周ごとにちょうど <b>e^(2π) = 535.4917</b> 倍縮むので、線形の画像では n=1 しか見えません（n=2 はサブピクセル）。</p>
+  <canvas id="cv"></canvas>
+  <div id="panel"></div>
+  <div id="status">読み込み中…</div>
+  <p class="sub">検算済み：b_crit = 5.196152422707 （√27 と13桁一致）、光子球 ρ = 1.866025 m（面積半径 3m）、
+  リング1ー4の曲がり角が π, 3π, 5π, 7π に6桁、弱い場で 4m/b に一致、太陽の縁で 1.751201″（VLBI 1.75119″）。
+  <br>数値は折り返し点の1次元積分が出しています。光線追跚は<b>絵専用</b>：光子球は不安定軌道なので、誤差が1周ごとに e^(2π) 倍で肥大化し、3周を超えると追えません。</p>
+  <p class="sub">ソース: <a href="https://github.com/yomei-o/universe_cpp">github.com/yomei-o/universe_cpp</a></p>
+
+<script src="sim.js"></script>
+<script>
+"use strict";
+// ---- per-sim config (only this block differs between sims) ----
+const CONFIG = {
+  sliders: [
+    { id:0, label:"log10 of b over b crit minus 1", min:-9, max:0.5, step:0.01, val:-1.5, dec:2 },
+    { id:1, label:"視野の半幅 m", min:3, max:40, step:0.5, val:14, dec:1 },
+    { id:2, label:"普通の光線を描く 1/0", min:0, max:1, step:1, val:1, dec:0 },
+  ],
+  buttons: [
+    { action:0, label:"光子リング 1 （π）" },
+    { action:1, label:"光子リング 2 （3π）" },
+    { action:2, label:"光子リング 3 （5π）" },
+    { action:3, label:"光子リング 4 （7π）" },
+    { action:4, label:"影の中（捕獲）" },
+    { action:5, label:"普通の光線 on/off" },
+  ],
+  clickable: true,
+  stepsPerFrame: 1,
+};
+
+// ---- generic harness (identical across all Universe OS sims) ----
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d"), panel=$("panel"), statusEl=$("status");
+let M=null, api={}, W=0, H=0, img=null, playing=true, raf=0, frames=0, lastT=0;
+
+createSim().then(mod=>{
+  M=mod;
+  api.init  =M.cwrap("sim_init","number",["number","number"]);
+  api.w     =M.cwrap("sim_w","number",[]);
+  api.h     =M.cwrap("sim_h","number",[]);
+  api.reset =M.cwrap("sim_reset",null,[]);
+  api.step  =M.cwrap("sim_step",null,["number"]);
+  api.render=M.cwrap("sim_render","number",[]);
+  api.click =M.cwrap("sim_click",null,["number","number"]);
+  api.set   =M.cwrap("sim_set",null,["number","number"]);
+  api.action=M.cwrap("sim_action",null,["number"]);
+  api.init(0,0);
+  W=api.w(); H=api.h(); cv.width=W; cv.height=H; img=ctx.createImageData(W,H);
+  buildPanel();
+  CONFIG.sliders.forEach(s=>api.set(s.id, s.val));   // push initial params
+  loop();
+});
+
+function buildPanel(){
+  CONFIG.sliders.forEach(s=>{
+    const wrap=document.createElement("label"); wrap.className="ctl";
+    const head=document.createElement("span"); head.innerHTML=`${s.label} <b id="v${s.id}">${(+s.val).toFixed(s.dec)}</b>`;
+    const inp=document.createElement("input"); inp.type="range";
+    inp.min=s.min; inp.max=s.max; inp.step=s.step; inp.value=s.val;
+    inp.addEventListener("input",()=>{ $("v"+s.id).textContent=(+inp.value).toFixed(s.dec); if(M)api.set(s.id,+inp.value); });
+    wrap.appendChild(head); wrap.appendChild(inp); panel.appendChild(wrap);
+  });
+  CONFIG.buttons.forEach(b=>{
+    const btn=document.createElement("button"); btn.textContent=b.label;
+    btn.addEventListener("click",()=>{ if(M){api.action(b.action); frames=0;} });
+    panel.appendChild(btn);
+  });
+  const pp=document.createElement("button"); pp.className="primary"; pp.textContent="⏸ 一時停止";
+  pp.addEventListener("click",()=>{ playing=!playing; pp.textContent=playing?"⏸ 一時停止":"▶ 再生"; if(playing){lastT=0;loop();} });
+  panel.appendChild(pp);
+  const rs=document.createElement("button"); rs.textContent="⟲ リセット";
+  rs.addEventListener("click",()=>{ if(M){api.reset(); frames=0; if(!playing){api.step(0);blit();}} });
+  panel.appendChild(rs);
+}
+
+function blit(){ const p=api.render(); img.data.set(M.HEAPU8.subarray(p,p+W*H*4)); ctx.putImageData(img,0,0); }
+function loop(ts){
+  if(!playing) return;
+  api.step(CONFIG.stepsPerFrame); blit(); frames++;
+  let fps=0; if(lastT) fps=1000/(ts-lastT); lastT=ts;
+  statusEl.textContent=`frame ${frames}   ${fps.toFixed(0)} fps`;
+  raf=requestAnimationFrame(loop);
+}
+
+if(CONFIG.clickable){
+  const emit=e=>{ const r=cv.getBoundingClientRect();
+    api.click((e.clientX-r.left)/r.width, (e.clientY-r.top)/r.height); };
+  let down=false;
+  cv.addEventListener("pointerdown",e=>{ down=true; if(M)emit(e); });
+  cv.addEventListener("pointermove",e=>{ if(down&&M)emit(e); });
+  window.addEventListener("pointerup",()=>{ down=false; });
+}
+</script>
+</body>
+</html>
