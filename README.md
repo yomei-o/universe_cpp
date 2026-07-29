@@ -2,7 +2,7 @@
 
 **日本語** | [English](README.en.md)
 
-28 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
+29 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
 JavaScript はブラウザに必須の部分（ピクセルバッファの canvas への転送・UI イベント）だけを担当します。描画には単一ヘッダの 2D グラフィックスライブラリ [olive.c](https://github.com/tsoding/olive.c)（MIT）を使い、C++ 側が RGBA フレームバッファへ直接描いています。
 
 元になった JavaScript 版は [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe) にあります。
@@ -41,6 +41,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🌀 | [平坦な格子と光子リング](https://yomei-o.github.io/universe_cpp/wasmdist/flatgrid_os/) | 格子は歪まず、場所で光速が変わる。影は min ρ/c ＝√27 m |
 | 🌊 | [川のモデル](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | 空間は厳密にユークリッド。川が光速に達する面が地平面 |
 | 🌞 | [光子球](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | 光が円を描けるが不安定。1周ごとに誤差が 535.49 倍 |
+| 🪞 | [2つの格子・1つの影](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | 静止格子と流れる格子を並べる。座標は別物でも影は 13 桁一致 |
 
 ## 💡 構成
 

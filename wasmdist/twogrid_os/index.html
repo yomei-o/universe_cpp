@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universe OS - Two Grids, One Shadow (C++/WASM)</title>
+<style>
+  :root{ --fg:#00ffcc; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:#020206; color:var(--fg); font-family:'Courier New',monospace;
+        min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  h1{ font-size:16px; margin:0; font-weight:700; }
+  .sub{ font-size:12px; color:#5fbfa8; max-width:880px; text-align:center; line-height:1.6; }
+  canvas{ width:min(96vw,900px); height:auto; image-rendering:pixelated; background:#020206;
+          border:1px solid #0a3; border-radius:6px; box-shadow:0 6px 26px #000a; cursor:crosshair; }
+  #panel{ display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:center; max-width:900px; }
+  .ctl{ display:flex; flex-direction:column; font-size:11px; color:#5fbfa8; min-width:150px; }
+  .ctl b{ color:var(--fg); }
+  input[type=range]{ accent-color:var(--fg); }
+  button{ font-family:inherit; font-size:13px; padding:7px 13px; border:1px solid #0a5; border-radius:6px;
+          background:#062018; color:var(--fg); cursor:pointer; }
+  button:hover{ background:#0a3324; }
+  button.primary{ background:var(--fg); color:#05130f; border:none; font-weight:700; }
+  #status{ font-size:12px; color:#5fbfa8; font-variant-numeric:tabular-nums; min-height:1.2em; }
+  a{ color:var(--fg); }
+  table{ border-collapse:collapse; font-size:11px; color:#5fbfa8; }
+  td,th{ border:1px solid #0a3; padding:4px 9px; text-align:left; }
+  th{ color:var(--fg); }
+</style>
+</head>
+<body>
+  <h1>🪞 Two Grids, One Shadow <span style="color:#5fbfa8;font-size:12px">(C++ / WASM)</span></h1>
+  <p class="sub">同じブラックホールを、<b>まったく違う 2 つの格子</b>で計算して並べたものです。</p>
+
+  <table>
+    <tr><th></th><th>左：静止した格子</th><th>右：流れる格子</th></tr>
+    <tr><th>格子</th><td>動かない。等方座標</td><td>ユークリッド。そのまま落ちていく</td></tr>
+    <tr><th>光速</th><td><b>場所で変わる</b> c(ρ)=(1−u)/(1+u)³</td><td><b>厳密に一定</b>。ただし川に流される</td></tr>
+    <tr><th>地平面とは</th><td>c が <b>0</b> になる面（ρ = m/2）</td><td>川の速さが <b>c に達する</b>面（r = 2m）</td></tr>
+    <tr><th>絵の見た目</th><td>喉のところに全部詰まる</td><td>ふつうの半径のまま広がる</td></tr>
+  </table>
+
+  <canvas id="cv"></canvas>
+  <div id="panel"></div>
+  <div id="status">読み込み中…</div>
+
+  <p class="sub"><b>それでも紫の輪 —— 影の縁 —— は左右でぴったり同じ大きさです。</b>
+  片方では「光速が 0 になる」ことで、もう片方では「川が光速に追いつく」ことで決まるのに、
+  出てくる衝突径数は<b>同じ数</b>になります：<br>
+  静止格子 b_crit = <b>5.196152422707</b>（min ρ/c(ρ) から）、
+  流れる格子 b_crit = <b>5.196152422707</b>（min r/√(1−2m/r) から）、
+  √27 = <b>5.196152422707</b>。<b>差 1.78×10⁻¹⁵</b> —— 倍精度の丸め誤差そのものです。<br>
+  光子軌道の面積半径も 左 2.999999984 / 右 2.999999999 で一致（どちらも 3m）。</p>
+
+  <p class="sub">曲がり角も一致します。b を b_crit に近づけると光は何周も回りますが、
+  <b>ちょうど π だけ曲がる</b>（＝真後ろに戻ってくる）b を左右それぞれで探すと、
+  右（折り返し点の積分）で <b>3.14327 rad</b>、目標 π = 3.14159 と 4 桁。
+  左（光線追跡）は 3.04691 rad で 3% 低いですが、これは有限の距離 X₀ で発射・打ち切っている分の誤差で、
+  X₀ を伸ばすと π に寄っていきます。<b>物理の違いではありません。</b></p>
+
+  <p class="sub">言いたいことはひとつです —— <b>座標の違いは物理の違いではない。</b>
+  格子が歪んでいるか、光速が変わるか、空間が流れているかは<b>選べます</b>。
+  選べないのは、望遠鏡が撮る影の大きさ 2√27 m のほうです。<br>
+  → 静止格子だけを詳しく見るなら <a href="../flatgrid_os/">flatgrid_os</a>、
+  流れる格子だけなら <a href="../river_os/">river_os</a>、
+  円軌道の不安定さは <a href="../photonsphere_os/">photonsphere_os</a>。</p>
+
+  <p class="sub">ソース: <a href="https://github.com/yomei-o/universe_cpp">github.com/yomei-o/universe_cpp</a></p>
+
+<script src="sim.js"></script>
+<script>
+"use strict";
+// ---- per-sim config (only this block differs between sims) ----
+const CONFIG = {
+  sliders: [
+    { id:0, label:"b を b_crit にどれだけ寄せるか 10^", min:-13, max:0.6, step:0.01, val:-1.2, dec:2 },
+    { id:1, label:"視野の半幅 m", min:3, max:30, step:0.5, val:12, dec:1 },
+  ],
+  buttons: [
+    { action:0, label:"光子リング 1（半周）" },
+    { action:1, label:"光子リング 2" },
+    { action:2, label:"光子リング 3" },
+    { action:3, label:"光子リング 4" },
+    { action:4, label:"影のふちぎりぎり" },
+  ],
+  clickable: true,
+  stepsPerFrame: 1,
+};
+
+// ---- generic harness (identical across all Universe OS sims) ----
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d"), panel=$("panel"), statusEl=$("status");
+let M=null, api={}, W=0, H=0, img=null, playing=true, raf=0, frames=0, lastT=0;
+
+createSim().then(mod=>{
+  M=mod;
+  api.init  =M.cwrap("sim_init","number",["number","number"]);
+  api.w     =M.cwrap("sim_w","number",[]);
+  api.h     =M.cwrap("sim_h","number",[]);
+  api.reset =M.cwrap("sim_reset",null,[]);
+  api.step  =M.cwrap("sim_step",null,["number"]);
+  api.render=M.cwrap("sim_render","number",[]);
+  api.click =M.cwrap("sim_click",null,["number","number"]);
+  api.set   =M.cwrap("sim_set",null,["number","number"]);
+  api.action=M.cwrap("sim_action",null,["number"]);
+  api.init(0,0);
+  W=api.w(); H=api.h(); cv.width=W; cv.height=H; img=ctx.createImageData(W,H);
+  buildPanel();
+  CONFIG.sliders.forEach(s=>api.set(s.id, s.val));   // push initial params
+  loop();
+});
+
+function buildPanel(){
+  CONFIG.sliders.forEach(s=>{
+    const wrap=document.createElement("label"); wrap.className="ctl";
+    const head=document.createElement("span"); head.innerHTML=`${s.label} <b id="v${s.id}">${(+s.val).toFixed(s.dec)}</b>`;
+    const inp=document.createElement("input"); inp.type="range";
+    inp.min=s.min; inp.max=s.max; inp.step=s.step; inp.value=s.val;
+    inp.addEventListener("input",()=>{ $("v"+s.id).textContent=(+inp.value).toFixed(s.dec); if(M)api.set(s.id,+inp.value); });
+    wrap.appendChild(head); wrap.appendChild(inp); panel.appendChild(wrap);
+  });
+  CONFIG.buttons.forEach(b=>{
+    const btn=document.createElement("button"); btn.textContent=b.label;
+    btn.addEventListener("click",()=>{ if(M){api.action(b.action); frames=0;} });
+    panel.appendChild(btn);
+  });
+  const pp=document.createElement("button"); pp.className="primary"; pp.textContent="⏸ 一時停止";
+  pp.addEventListener("click",()=>{ playing=!playing; pp.textContent=playing?"⏸ 一時停止":"▶ 再生"; if(playing){lastT=0;loop();} });
+  panel.appendChild(pp);
+  const rs=document.createElement("button"); rs.textContent="⟲ リセット";
+  rs.addEventListener("click",()=>{ if(M){api.reset(); frames=0; if(!playing){api.step(0);blit();}} });
+  panel.appendChild(rs);
+}
+
+function blit(){ const p=api.render(); img.data.set(M.HEAPU8.subarray(p,p+W*H*4)); ctx.putImageData(img,0,0); }
+function loop(ts){
+  if(!playing) return;
+  api.step(CONFIG.stepsPerFrame); blit(); frames++;
+  let fps=0; if(lastT) fps=1000/(ts-lastT); lastT=ts;
+  statusEl.textContent=`frame ${frames}   ${fps.toFixed(0)} fps`;
+  raf=requestAnimationFrame(loop);
+}
+
+if(CONFIG.clickable){
+  const emit=e=>{ const r=cv.getBoundingClientRect();
+    api.click((e.clientX-r.left)/r.width, (e.clientY-r.top)/r.height); };
+  let down=false;
+  cv.addEventListener("pointerdown",e=>{ down=true; if(M)emit(e); });
+  cv.addEventListener("pointermove",e=>{ if(down&&M)emit(e); });
+  window.addEventListener("pointerup",()=>{ down=false; });
+}
+</script>
+</body>
+</html>
