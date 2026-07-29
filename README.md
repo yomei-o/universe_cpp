@@ -2,7 +2,7 @@
 
 **日本語** | [English](README.en.md)
 
-29 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
+30 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
 JavaScript はブラウザに必須の部分（ピクセルバッファの canvas への転送・UI イベント）だけを担当します。描画には単一ヘッダの 2D グラフィックスライブラリ [olive.c](https://github.com/tsoding/olive.c)（MIT）を使い、C++ 側が RGBA フレームバッファへ直接描いています。
 
 元になった JavaScript 版は [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe) にあります。
@@ -42,6 +42,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🌊 | [川のモデル](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | 空間は厳密にユークリッド。川が光速に達する面が地平面 |
 | 🌞 | [光子球](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | 光が円を描けるが不安定。1周ごとに誤差が 535.49 倍 |
 | 🪞 | [2つの格子・1つの影](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | 動かない格子と落ちてくる水を並べる。座標は別物でも影は 13 桁一致 |
+| 📡 | [レーダー往復](https://yomei-o.github.io/universe_cpp/wasmdist/radar_os/) | 数値相対論と c·t=const を同じ実験で照合。折り返しは 14.9 違い、往復は 12 桁一致 |
 
 ## 💡 構成
 
