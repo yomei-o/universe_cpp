@@ -1,8 +1,19 @@
 // Universe OS — Radar: Two Charts, One Answer  (C++/WASM)
 //
-// A numerical relativity code and a "c*t = const" calculation, running side by
-// side on the same physical experiment: bounce a light pulse off a mirror near
-// a black hole and time the round trip at the dish.
+// The 3+1 bookkeeping that numerical relativity uses, and a "c*t = const"
+// calculation, running side by side on the same physical experiment: bounce a
+// light pulse off a mirror near a black hole and time the round trip at the dish.
+//
+// WHAT THIS IS NOT: this does not solve the Einstein equations. The metric is
+// an analytic background typed in by hand and a test field is advected on top
+// of it. Of the lines in this file, the relativity is 13 of them -- eleven
+// one-line metric functions and the two lines of coordinate light speed below.
+// Everything else is 4th order finite differences, RK4, Simpson, a 5 point
+// filter and drawing. No ADM, no BSSN, no constraints, no curvature, no
+// horizon finder, no waveform extraction, no mesh refinement -- which is to
+// say, none of the parts that make real numerical relativity hard. What is
+// being checked here is narrower and it is the whole point: write the same
+// spacetime in two charts, and see whether the observable comes out the same.
 //
 // Both panels integrate the SAME 3+1 formula for the coordinate light speed,
 //

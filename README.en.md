@@ -41,7 +41,7 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 | 🌊 | [River model](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | Space is exactly euclidean; the horizon is where the river reaches c |
 | 🌞 | [Photon sphere](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | Light can circle but the orbit is unstable: error grows 535.49x per turn |
 | 🪞 | [Two grids, one shadow](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | A grid that never moves vs water that actually falls: different coordinates, same shadow to 13 digits |
-| 📡 | [Radar, two charts one answer](https://yomei-o.github.io/universe_cpp/wasmdist/radar_os/) | Numerical relativity vs c·t=const on one experiment: they disagree by 14.9 on the turnaround and by 5e-13 on the round trip |
+| 📡 | [Radar, two charts one answer](https://yomei-o.github.io/universe_cpp/wasmdist/radar_os/) | The 3+1 bookkeeping vs c·t=const on one experiment: apart by 14.9 on the turnaround, 5e-13 on the round trip (fixed background, not an Einstein solver) |
 
 ## 💡 Architecture
 

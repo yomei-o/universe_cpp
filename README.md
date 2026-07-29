@@ -42,7 +42,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | 🌊 | [川のモデル](https://yomei-o.github.io/universe_cpp/wasmdist/river_os/) | 空間は厳密にユークリッド。川が光速に達する面が地平面 |
 | 🌞 | [光子球](https://yomei-o.github.io/universe_cpp/wasmdist/photonsphere_os/) | 光が円を描けるが不安定。1周ごとに誤差が 535.49 倍 |
 | 🪞 | [2つの格子・1つの影](https://yomei-o.github.io/universe_cpp/wasmdist/twogrid_os/) | 動かない格子と落ちてくる水を並べる。座標は別物でも影は 13 桁一致 |
-| 📡 | [レーダー往復](https://yomei-o.github.io/universe_cpp/wasmdist/radar_os/) | 数値相対論と c·t=const を同じ実験で照合。折り返しは 14.9 違い、往復は 12 桁一致 |
+| 📡 | [レーダー往復](https://yomei-o.github.io/universe_cpp/wasmdist/radar_os/) | 3+1 の帳簿と c·t=const を同じ実験で照合。折り返しは 14.9 違い、往復は 12 桁一致（背景は固定・方程式は解かない） |
 
 ## 💡 構成
 
