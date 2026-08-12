@@ -273,7 +273,7 @@ static const int MAXAO = 40;
 static const int MAXMO = 24;
 static const int MAXEL = 24;
 static const int MAXW  = 64;
-static const int NTRAIL = 26;
+static const int NTRAIL = 34;
 
 struct Atom { int Z, A; double R[3]; };
 
@@ -1248,7 +1248,7 @@ static void qmd_step(double dt)
     // Trail sampling stride.  qmd_step runs many times per rendered frame, so
     // recording every step gives a trail that spans a fraction of one frame and
     // is therefore invisible.  With this stride the trail covers
-    // NTRAIL * NUC_TRSTRIDE * dt = 26 * 14 * 0.2 = 73 fm/c of real time.
+    // NTRAIL * NUC_TRSTRIDE * dt = 34 * 14 * 0.2 = 95 fm/c of real time.
     if (++g_nuctr >= NUC_TRSTRIDE) {
         g_nuctr = 0;
         for (int i = 0; i < n; ++i) {
@@ -1568,8 +1568,8 @@ static void quark_step(double dt)
         s2 += dx * dx + dy * dy + dz * dz;
     }
     g_qRrms = std::sqrt(s2 / 3.0);
-    // same stride reasoning as the nucleons: 26 * 26 * 0.0012 = 0.81 fm/c,
-    // about a third of the 2.7 fm/c orbital period
+    // same stride reasoning as the nucleons: 34 * 26 * 0.0012 = 1.06 fm/c,
+    // about 40 percent of the 2.7 fm/c orbital period
     if (++g_qtr >= QK_TRSTRIDE) {
         g_qtr = 0;
         for (int i = 0; i < 3; ++i) {
@@ -1801,7 +1801,7 @@ static int    g_sweeps  = 2;
 static bool   g_bonds   = true;
 static bool   g_trails  = true;
 static int    g_dispmode = 0;   // 0 cloud, 1 particles, 2 both
-static const int TRDRAW = 13;   // trail points actually drawn
+static const int TRDRAW = 32;   // trail points actually drawn
 static int    g_selatom = 0;
 static double g_viewR   = 4.0;    // half width of the atom panel, in bohr
 static bool   g_busy    = false;
@@ -2524,7 +2524,7 @@ KEEP void sim_step(int n)
 {
     if (g_busy) return;
     for (int s = 0; s < n; ++s) {
-        for (int k = 0; k < g_sweeps; ++k)
+        for (int k = 0; k < g_sweeps; ++k) {
             for (int i = 0; i < g_nw; ++i) {
                 vmc_sweep(g_w[i]);
                 if (g_w[i].ok) {
@@ -2532,15 +2532,20 @@ KEEP void sim_step(int n)
                     if (std::isfinite(e)) { g_w[i].eloc = e; stat_add(e); }
                 }
             }
-        // one trail sample per rendered frame, for every walker
-        if (g_dispmode != 0) {
-            for (int i = 0; i < g_nw; ++i) {
-                Walker& w = g_w[i];
-                w.tn = (w.tn + 1) % NTRAIL;
-                for (int q = 0; q < g_nel; ++q) {
-                    w.tx[q][w.tn] = (float)w.r[q][0];
-                    w.ty[q][w.tn] = (float)w.r[q][1];
-                    w.tz[q][w.tn] = (float)w.r[q][2];
+            // Record the trail once per SWEEP, not once per frame.  With more
+            // than one sweep per frame, a per-frame sample would skip the
+            // intermediate positions and draw a straight line across them,
+            // making the path look smoother than it is.  One drawn segment is
+            // now exactly one Metropolis step.
+            if (g_dispmode != 0) {
+                for (int i = 0; i < g_nw; ++i) {
+                    Walker& w = g_w[i];
+                    w.tn = (w.tn + 1) % NTRAIL;
+                    for (int q = 0; q < g_nel; ++q) {
+                        w.tx[q][w.tn] = (float)w.r[q][0];
+                        w.ty[q][w.tn] = (float)w.r[q][1];
+                        w.tz[q][w.tn] = (float)w.r[q][2];
+                    }
                 }
             }
         }
@@ -2854,6 +2859,59 @@ int main(int argc, char** argv)
         stbi_write_png(fn, FW, FH, 4, px, FW * 4);
         std::printf("wrote %s   %s  Nel %d  E %.4f (exact %.4f)\n", fn, SYS[sys].name, g_nel,
                     g_ecnt ? g_esum / g_ecnt : 0.0, SYS[sys].Eref);
+        return 0;
+    }
+    if (!std::strcmp(mode, "walk")) {
+        // Is the drawn trail a badly sampled smooth curve, or a genuinely
+        // non-differentiable diffusion path?  Decisive test: hold the total
+        // elapsed TIME fixed and refine tau.
+        //   smooth curve  -> measured path length converges to a constant
+        //   Brownian path -> length grows as tau^{-1/2} and never converges
+        // Also report the mean cosine of the turn angle between consecutive
+        // steps: ~1 for a smooth path, ~0 for an uncorrelated random walk.
+        int sys = argc > 2 ? atoi(argv[2]) : 7;
+        double T = argc > 3 ? atof(argv[3]) : 40.0;
+        g_rs = 20260812ull; g_ghas = false;
+        g_sysid = sys;
+        setup_electrons(sys);
+        trial_load(sys);
+        std::printf("%s   total elapsed time held fixed at T = %.1f (atomic units)\n", SYS[sys].name, T);
+        std::printf("%8s %8s %12s %10s %10s\n", "tau0", "steps", "path length", "L*sqrt(t)", "cos(turn)");
+        double prevL = 0.0;
+        for (double t0 : {0.16, 0.04, 0.01, 0.0025, 0.000625}) {
+            g_tau0 = t0;
+            long N = (long)(T / t0);
+            g_nw = 1; vmc_reset_walkers();
+            for (int e = 0; e < 3000; ++e) vmc_sweep(g_w[0]);      // equilibrate
+            double L = 0.0, cs = 0.0; long nc = 0;
+            double prev[3], d0[3] = {0, 0, 0};
+            for (int k = 0; k < 3; ++k) prev[k] = g_w[0].r[0][k];
+            bool have0 = false;
+            for (long st = 0; st < N; ++st) {
+                vmc_sweep(g_w[0]);
+                double d[3], dn = 0;
+                for (int k = 0; k < 3; ++k) { d[k] = g_w[0].r[0][k] - prev[k]; dn += d[k] * d[k]; }
+                dn = std::sqrt(dn);
+                L += dn;
+                if (dn > 1e-12) {
+                    if (have0) {
+                        double dot = 0;
+                        for (int k = 0; k < 3; ++k) dot += (d[k] / dn) * d0[k];
+                        cs += dot; nc++;
+                    }
+                    for (int k = 0; k < 3; ++k) d0[k] = d[k] / dn;
+                    have0 = true;
+                }
+                for (int k = 0; k < 3; ++k) prev[k] = g_w[0].r[0][k];
+            }
+            std::printf("%8.6f %8ld %12.2f %10.2f %10.3f%s\n", t0, N, L, L * std::sqrt(t0),
+                        nc ? cs / nc : 0.0,
+                        prevL > 0 ? (std::fabs(L / prevL - 2.0) < 0.35 ? "   x2 -> diverging" : "") : "");
+            prevL = L;
+        }
+        g_tau0 = TAU_CLOUD;
+        std::printf("\nif the length doubles each time tau drops 4x, the path is Brownian\n");
+        std::printf("and L*sqrt(tau) is the invariant.  a smooth curve would give a constant L.\n");
         return 0;
     }
     if (!std::strcmp(mode, "fall")) {
