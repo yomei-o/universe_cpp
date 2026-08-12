@@ -2876,14 +2876,15 @@ int main(int argc, char** argv)
         setup_electrons(sys);
         trial_load(sys);
         std::printf("%s   total elapsed time held fixed at T = %.1f (atomic units)\n", SYS[sys].name, T);
-        std::printf("%8s %8s %12s %10s %10s\n", "tau0", "steps", "path length", "L*sqrt(t)", "cos(turn)");
+        std::printf("%8s %8s %12s %10s %10s %10s\n", "tau0", "steps", "path length", "L*sqrt(t)",
+                    "cos(turn)", "<r> bohr");
         double prevL = 0.0;
         for (double t0 : {0.16, 0.04, 0.01, 0.0025, 0.000625}) {
             g_tau0 = t0;
             long N = (long)(T / t0);
             g_nw = 1; vmc_reset_walkers();
             for (int e = 0; e < 3000; ++e) vmc_sweep(g_w[0]);      // equilibrate
-            double L = 0.0, cs = 0.0; long nc = 0;
+            double L = 0.0, cs = 0.0, rs2 = 0.0; long nc = 0, nr = 0;
             double prev[3], d0[3] = {0, 0, 0};
             for (int k = 0; k < 3; ++k) prev[k] = g_w[0].r[0][k];
             bool have0 = false;
@@ -2903,9 +2904,11 @@ int main(int argc, char** argv)
                     have0 = true;
                 }
                 for (int k = 0; k < 3; ++k) prev[k] = g_w[0].r[0][k];
+                double* rr = g_w[0].r[0];
+                rs2 += std::sqrt(rr[0] * rr[0] + rr[1] * rr[1] + rr[2] * rr[2]); nr++;
             }
-            std::printf("%8.6f %8ld %12.2f %10.2f %10.3f%s\n", t0, N, L, L * std::sqrt(t0),
-                        nc ? cs / nc : 0.0,
+            std::printf("%8.6f %8ld %12.2f %10.2f %10.3f %10.4f%s\n", t0, N, L, L * std::sqrt(t0),
+                        nc ? cs / nc : 0.0, nr ? rs2 / nr : 0.0,
                         prevL > 0 ? (std::fabs(L / prevL - 2.0) < 0.35 ? "   x2 -> diverging" : "") : "");
             prevL = L;
         }
