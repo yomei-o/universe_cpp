@@ -2,7 +2,7 @@
 
 [日本語](README.md) | **English**
 
-32 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
+33 physics simulations where **both the computation and the rendering are written in C++** and compiled to WebAssembly. JavaScript only does what the browser requires (blitting the pixel buffer to a canvas, forwarding UI events). Rendering uses the single-header 2D graphics library [olive.c](https://github.com/tsoding/olive.c) (MIT); the C++ side draws straight into an RGBA framebuffer.
 
 The original JavaScript versions live at [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe).
 
@@ -25,6 +25,7 @@ The original JavaScript versions live at [yomei-o.github.io/universe](https://gi
 | ☢️ | [Neutron decay](https://yomei-o.github.io/universe_cpp/wasmdist/neutron_decay_os/) | Beta decay (wave mode / particle mode) |
 | 🕸️ | [Spacetime mesh](https://yomei-o.github.io/universe_cpp/wasmdist/universe_os/) | Click a black hole to warp the lattice |
 | 📐 | [Casimir effect](https://yomei-o.github.io/universe_cpp/wasmdist/casimir_vacuum_os/) | Vacuum-fluctuation pressure difference moving plates |
+| ⚛️ | [Atom / nucleus / quarks (3 scales)](https://yomei-o.github.io/universe_cpp/wasmdist/atom_os/) | Electrons by variational Monte Carlo so point walkers sample the many-body probability density (the s/p orbitals are visible), nucleus by QMD, nucleon by a relativistic Y-string. H..Ar plus H2/H2O/O2/N2/CH4/NH3/HF/CO. [derivation](docs/atom_os_derivation.md) |
 | 🌫️ | [Electron cloud](https://yomei-o.github.io/universe_cpp/wasmdist/electron_os/) | Electron orbitals; click to add a nucleus (covalent) |
 | ⚡ | [Weak interaction](https://yomei-o.github.io/universe_cpp/wasmdist/weak_os/) | Neutron → proton + electron (beta decay) |
 | ♾️ | [Three-body](https://yomei-o.github.io/universe_cpp/wasmdist/three_body_chaos_working/) | Figure-8 choreography and chaos (error injection) |

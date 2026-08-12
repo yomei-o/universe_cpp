@@ -2,7 +2,7 @@
 
 **日本語** | [English](README.en.md)
 
-32 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
+33 個の物理シミュレーションを、**計算も描画もすべて C++ で実装して WebAssembly にコンパイル**したものです。
 JavaScript はブラウザに必須の部分（ピクセルバッファの canvas への転送・UI イベント）だけを担当します。描画には単一ヘッダの 2D グラフィックスライブラリ [olive.c](https://github.com/tsoding/olive.c)（MIT）を使い、C++ 側が RGBA フレームバッファへ直接描いています。
 
 元になった JavaScript 版は [yomei-o.github.io/universe](https://github.com/yomei-o/yomei-o.github.io/tree/main/universe) にあります。
@@ -26,6 +26,7 @@ JavaScript はブラウザに必須の部分（ピクセルバッファの canva
 | ☢️ | [中性子崩壊](https://yomei-o.github.io/universe_cpp/wasmdist/neutron_decay_os/) | β崩壊（波モード／粒子モード） |
 | 🕸️ | [時空メッシュ](https://yomei-o.github.io/universe_cpp/wasmdist/universe_os/) | クリックしたブラックホールで格子が歪む |
 | 📐 | [カシミール効果](https://yomei-o.github.io/universe_cpp/wasmdist/casimir_vacuum_os/) | 真空ゆらぎの圧力差で板が動く |
+| ⚛️ | [原子・核・クォーク（3階層）](https://yomei-o.github.io/universe_cpp/wasmdist/atom_os/) | 電子は変分モンテカルロで確率密度を粒子がサンプリング（s/p 軌道が見える）、核は QMD、核子は相対論的 Y ストリング。元素 H〜Ar と H2/H2O/O2/N2/CH4/NH3/HF/CO。[導出](docs/atom_os_derivation.md) |
 | 🌫️ | [電子雲](https://yomei-o.github.io/universe_cpp/wasmdist/electron_os/) | 核に束縛された電子軌道（クリックで共有結合） |
 | ⚡ | [弱い相互作用](https://yomei-o.github.io/universe_cpp/wasmdist/weak_os/) | 中性子→陽子＋電子（β崩壊） |
 | ♾️ | [三体問題](https://yomei-o.github.io/universe_cpp/wasmdist/three_body_chaos_working/) | 8 の字周期軌道とカオス（誤差注入） |
@@ -81,6 +82,7 @@ for f in src/*.cpp; do ./build.sh "$(basename "$f" .cpp)"; done
 | `build.sh` | 1 つの sim を Emscripten でビルド |
 | `wasmdist/<name>/` | ビルド済みデモ（`index.html` + `sim.js` + `sim.wasm`）|
 | `wasmdist/index.html` | 全デモへのギャラリー |
+| `docs/atom_os_derivation.md` | atom_os の 3 階層それぞれの差分方程式の導出 |
 
 ## 📝 ライセンス / 注意
 

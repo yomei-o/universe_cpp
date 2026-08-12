@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Universe OS - 原子・原子核・クォーク 3階層シミュレーション (C++/WASM)</title>
+<style>
+  :root{ --fg:#8fffe0; --dim:#5fbfa8; --warn:#ffc46a; }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:#05050a; color:var(--fg); font-family:'Courier New',monospace;
+        min-height:100vh; display:flex; flex-direction:column; align-items:center; gap:12px; padding:16px; }
+  h1{ font-size:17px; margin:0; font-weight:700; text-align:center; }
+  .sub{ font-size:12.5px; color:var(--dim); max-width:1040px; line-height:1.75; }
+  .sub b{ color:var(--fg); }
+  .sub code{ color:#ffd9a0; }
+  canvas{ width:min(98vw,1080px); height:auto; image-rendering:pixelated; background:#05050a;
+          border:1px solid #0a4; border-radius:6px; box-shadow:0 6px 26px #000a; cursor:crosshair; }
+  #panel{ display:flex; flex-wrap:wrap; gap:12px 16px; align-items:flex-end; justify-content:center; max-width:1080px; }
+  .ctl{ display:flex; flex-direction:column; font-size:11px; color:var(--dim); min-width:148px; }
+  .ctl b{ color:var(--fg); }
+  select{ font-family:inherit; font-size:13px; padding:5px 8px; background:#062018; color:var(--fg);
+          border:1px solid #0a5; border-radius:5px; }
+  input[type=range]{ accent-color:var(--fg); }
+  button{ font-family:inherit; font-size:12.5px; padding:6px 11px; border:1px solid #0a5; border-radius:6px;
+          background:#062018; color:var(--fg); cursor:pointer; }
+  button:hover{ background:#0a3324; }
+  button.primary{ background:var(--fg); color:#05130f; border:none; font-weight:700; }
+  #status{ font-size:12px; color:var(--dim); font-variant-numeric:tabular-nums; min-height:1.2em; }
+  a{ color:var(--fg); }
+  details{ max-width:1040px; font-size:12.5px; color:var(--dim); line-height:1.75;
+           border:1px solid #0a3a30; border-radius:6px; padding:10px 14px; background:#060f0d; }
+  summary{ color:var(--fg); cursor:pointer; font-weight:700; }
+  .eq{ display:block; color:#ffd9a0; margin:6px 0 10px; white-space:pre-wrap; font-size:12px; line-height:1.6; }
+  table{ border-collapse:collapse; font-size:12px; margin:8px 0; }
+  th,td{ border:1px solid #0a3a30; padding:3px 8px; text-align:right; }
+  th{ color:var(--fg); }
+  td:first-child,th:first-child{ text-align:left; }
+</style>
+</head>
+<body>
+  <h1>⚛️ 原子 → 原子核 → クォーク　3階層まるごと粒子シミュレーション <span style="color:var(--dim);font-size:12px">(C++ / WASM)</span></h1>
+
+  <p class="sub">
+  <b>全部「粒子」で、全部それぞれの差分方程式で解いています。</b>ずるはしていません。3つの階層は 10<sup>5</sup> 倍ずつスケールが違うので、
+  同時に見せるためにパネルごとに倍率を変えてあります（各パネルに実スケールバーと倍率を表示）。
+  <br>
+  ① <b>電子</b>：点電子をクーロン力で回しても s/p 軌道は絶対に出ません（古典電子は放射して落ちるだけ）。
+  なので<b>変分モンテカルロ (VMC)</b> で、多体波動関数 |Ψ|² を粒子（ウォーカー）が厳密にサンプリングします。
+  スレーター行列式の反対称性が殻構造・パウリ排他・p軌道のローブ・フントの規則を作ります。
+  ② <b>原子核</b>：陽子と中性子を<b>量子分子動力学 (QMD)</b> のガウス波束で。Skyrme + 対称エネルギー + クーロン + パウリポテンシャル。
+  ③ <b>核子</b>：3つのクォークを<b>相対論的コーネル型ポテンシャル + Yストリング</b>（格子QCDが支持するシュタイナー木）で。
+  </p>
+
+  <canvas id="cv"></canvas>
+  <div id="panel"></div>
+  <div id="status">読み込み中…</div>
+
+  <details>
+    <summary>導出した差分方程式（これがコードそのものです）</summary>
+
+    <p><b>① 電子：メトロポリス・ドリフト拡散差分方程式</b><br>
+    試行関数（原子単位 ħ = m<sub>e</sub> = e = 1）：</p>
+    <span class="eq">Psi_T(R) = det[Phi_j(r_i)]_up · det[Phi_j(r_i)]_dn · exp(J)
+Phi_j = sum_k c_jk chi_k          … LCAO 分子軌道
+chi   = 水素型スレーター軌道（指数 zeta）
+J     = sum_{i&lt;j} a_ij r_ij/(1 + b r_ij),   a_ij = 1/2（反平行）, 1/4（平行）</span>
+    <p>a<sub>ij</sub> の値は電子-電子カスプ条件そのもの（勝手な値ではありません）。
+    f(R) = |Ψ<sub>T</sub>(R)|² を定常解にもつフォッカー・プランク方程式</p>
+    <span class="eq">df/dt = D grad·( grad f − F f ),      F = grad ln|Psi_T|^2 = 2 grad Psi / Psi</span>
+    <p>に対応するランジュバン方程式を伊藤離散化すると（1電子ずつ動かす）：</p>
+    <span class="eq">r_i^{n+1} = r_i^n + D tau_i F_i(R^n) + sqrt(2 D tau_i) xi ,   xi ~ N(0,1)^3,  D = 1/2</span>
+    <p>τ が有限だとこれはバイアスを持つので、提案密度</p>
+    <span class="eq">G(r-&gt;r') = (4 pi D tau)^{-3/2} exp( −|r' − r − D tau F(r)|^2 / (4 D tau) )
+A = min( 1,  |Psi(R')|^2 G(r'-&gt;r) / ( |Psi(R)|^2 G(r-&gt;r') ) )</span>
+    <p>でメトロポリス・ヘイスティングス補正します。これで<b>どんな τ でも分布は厳密に |Ψ<sub>T</sub>|²</b>（時間刻み誤差ゼロ）。
+    τ は原子核の近くで小さく、価電子領域で大きくしてありますが、逆向きの遷移で τ(r′) を使うので厳密性は保たれます
+    （だから両方の規格化因子をきちんと残しています）。1電子移動の Ψ 比は逆行列を使って O(N) で：</p>
+    <span class="eq">ratio_det       = sum_j Phi_j(r_i') · Ainv[j][i]
+grad ln det|r_i' = ( sum_j Ainv[j][i] grad Phi_j(r_i') ) / ratio_det</span>
+    <p>観測量（＝これが正しさの証拠）：</p>
+    <span class="eq">E_L(R) = −1/2 sum_i (lap Psi/Psi)_i + V(R)
+(lap Psi/Psi)_i = (lap det/det)_i + lap_i J + |grad_i J|^2 + 2 (grad_i ln det)·(grad_i J)
+V = −sum_A Z_A/|r_i−R_A| + sum_{i&lt;j} 1/r_ij + sum_{A&lt;B} Z_A Z_B/R_AB</span>
+    <p>&lt;E<sub>L</sub>&gt; は変分エネルギー、つまり<b>真の基底状態の上限</b>です。画面には厳密な非相対論的値と並べて表示しています。
+    誤差棒はブロック平均法（連続サンプルは相関するので √(var/N) では過小評価になる）。</p>
+
+    <p><b>② 核子：QMD 差分方程式</b><br>
+    各核子は幅 L の固定ガウス波束。積状態での期待値をとると古典ハミルトニアンになります：</p>
+    <span class="eq">rho_ij = (4 pi L)^{-3/2} exp( −r_ij^2 / (4 L) )                     … 重なり密度
+H = sum_i P_i^2/(2M)
+  + (alpha/(2 rho0)) sum_{i≠j} rho_ij                              … Skyrme 2体
+  + (beta/((g+1) rho0^g)) sum_i ( sum_{j≠i} rho_ij )^g              … Skyrme 密度依存
+  + (Cs/(2 rho0)) sum_{i≠j} tau_i tau_j rho_ij                      … 対称エネルギー
+  + (e^2/2) sum_{i≠j, p p} erf(r_ij/(2 sqrt L))/r_ij                … クーロン
+  + Cz sum_{i&lt;j} exp(−r_ij^2/(2 az^2))                              … NN 短距離斥力コア
+  + Cp sum_{i&lt;j} d_tau d_spin exp(−r_ij^2/(2 q0^2) − p_ij^2/(2 p0^2)) … パウリポテンシャル</span>
+    <p>パウリポテンシャルが古典核子MDにおける反対称性の代役で、同種核子を同じ位相空間セルから追い出しフェルミ運動を供給します
+    （Wilets, Dorso–Randrup の方法）。H が P に運動項以外で依存するので dR/dt = ∂H/∂P ≠ P/M、
+    したがって普通の leapfrog は使えません。導出される更新式は<b>陽的中点法（2次ルンゲ・クッタ）</b>：</p>
+    <span class="eq">R* = R^n + (dt/2) ∂H/∂P(R^n,P^n) ,   P* = P^n − (dt/2) ∂H/∂R(R^n,P^n)
+R^{n+1} = R^n + dt ∂H/∂P(R*,P*) ,   P^{n+1} = P^n − dt ∂H/∂R(R*,P*)</span>
+    <p>使う解析的な微分（d rho_ij/dR_i = −rho_ij (R_i−R_j)/(2L)）：</p>
+    <span class="eq">dE_sk2/dR_i = (alpha/rho0) sum_j d rho_ij/dR_i
+dE_sk3/dR_i = (beta g/((g+1) rho0^g)) sum_j (rb_i^{g−1} + rb_j^{g−1}) d rho_ij/dR_i
+d/dr [erf(r/a)/r] = 2 exp(−r^2/a^2)/(a sqrt(pi) r) − erf(r/a)/r^2
+dVp/dR_i = −Vp (R_i−R_j)/q0^2 ,   dVp/dP_i = −Vp (P_i−P_j)/p0^2</span>
+    <p>基底状態は<b>同じ H の位相空間最急降下</b>で作ります（R と P の両方を降下させる：パウリ項があるので
+    H の最小点は P ≠ 0）。ここで大事な事実：<b>完全に緩和した古典核は静止します</b>（最小点では dR/dt = ∂H/∂P = 0）。
+    実際の原子核は核子あたり約20 MeV の量子的ゼロ点フェルミ運動を持っていますが、古典モデルはそれを「運動」として持てません。
+    したがって画面で見えている運動は、<b>明示的に与えた励起エネルギー E*</b> と<b>集団回転 J</b> です（両方とも実在の物理量で、数値を表示しています）。</p>
+
+    <p><b>③ クォーク：相対論的シンプレクティック差分方程式</b></p>
+    <span class="eq">H = sum_i sqrt(p_i^2 + m_i^2) + V(x)
+V = −kappa sum_{i&lt;j} erf(r_ij/r0)/r_ij + sigma · L_Y(x) + V0
+kappa = (2/3) alpha_s hbar c          … 3クォーク色一重項の色因子
+L_Y   = 最小全ストリング長 = 3点のシュタイナー（フェルマー）木</span>
+    <p>H = T(p) + V(x) と分離できるので、厳密にシンプレクティックな kick–drift–kick が使えます
+    （エネルギーはドリフトなしで保存。画面に相対ドリフトを表示しています）：</p>
+    <span class="eq">p^{n+1/2} = p^n       − (dt/2) grad V(x^n)
+x^{n+1}   = x^n       + dt · p^{n+1/2} / sqrt((p^{n+1/2})^2 + m^2)
+p^{n+1}   = p^{n+1/2} − (dt/2) grad V(x^{n+1})</span>
+    <p>dx/dt = p/E はまさに相対論的速度 v/c。ストリングの勾配は包絡線定理で、接合点 S が最小点にあるので</p>
+    <span class="eq">dL_Y/dx_i = (x_i − S)/|x_i − S|      … 大きさ1の単位ベクトル</span>
+    <p>つまり<b>どれだけ引き離しても内向きの力は σ で一定</b>＝クォークは絶対に外に出られない。
+    これは押しつけた仕様ではなく σ·L という項の帰結です（角度が120°以上になると接合点はその頂点に退化するので、
+    その場合の勾配も別に導出して実装しています。ここを手抜きするとエネルギー保存が壊れます）。</p>
+    <p>核子の<b>大きさ</b>はどこから来るか：円軌道の力の釣り合い</p>
+    <span class="eq">(A)  p^2 / sqrt(p^2 + m^2) = (R/3) dV_eq/dR</span>
+    <p>だけでは決まりません（どの R でも解があり、古典的には R → 0 に潰れる）。核子の大きさは量子的なので、
+    水素原子のボーア半径を決めるのと<b>同じボーア＝ゾンマーフェルト条件</b>で閉じます：</p>
+    <span class="eq">(B)  p R = n hbar          （n = 1 が基底のピンホイール）</span>
+    <p>(B) を (A) に代入すると R について1本の方程式になり、二分法で解いています。R も p も手で入れていません。
+    V<sub>0</sub> は構成子クォーク模型の標準的な加算定数で、n = 1 のときに核子質量に合わせて<b>一度だけ</b>決め、以後触りません。
+    だから n = 2, 3 … の軌道は本当に重くなります（実在の N* 共鳴と同じ）。</p>
+  </details>
+
+  <details>
+    <summary>正直に言っておく近似と誤差（測った数値つき）</summary>
+    <ul>
+      <li><b>電子</b>：最小基底（1s/2s/2p/3s/3p のスレーター型）＋2体ジャストロウなので、全エネルギーは厳密値より数%高く出ます。
+      実測で原子は最大 2.1%、分子は 1.8〜7.6%。<b>変分原理の上限は必ず守られています</b>（画面の値が厳密値を下回ることはありません）。
+      軌道の形・節・スピン多重度は正しく出ます（O₂ が勝手にスピン三重項 ↑9/↓7 になるのが良い例）。</li>
+      <li><b>電子</b>：核は固定（ボルン・オッペンハイマー）。分子の幾何は実験値を使っています。</li>
+      <li><b>原子核</b>：モデルは結合エネルギーと点核子rms半径の2つの実測量だけに合わせて校正（He-4 〜 Ar-40 の9核種、相対誤差RMS 6.5%）。
+      A ≥ 12 で E/A の誤差 0.2〜2.9%、半径 3.5〜5.9%。<b>He-4 は外れ値</b>（E/A 21%、半径 14%）：
+      4核子は (τ,σ) が全部違うのでパウリ対が1つも無く、古典モデルでは支えが足りません。</li>
+      <li><b>原子核</b>：上で書いたとおり基底状態の古典核は静止するので、動きは E* と J として明示的に入れています。</li>
+      <li><b>クォーク</b>：この「ピンホイール」は軌道角運動量 3nħ を持ちますが、実際の核子基底状態は L = 0 の J = 1/2 です。
+      古典軌道は s 波になれません。これは<b>同じハミルトニアンの、同じ大きさ・同じ運動量スケールでの古典状態</b>です。
+      陽子と中性子の質量差（1.3 MeV）は電磁的効果と m<sub>d</sub> − m<sub>u</sub> によるもので、このモデルは分解しません（アイソスピン対称で扱っています）。</li>
+      <li><b>スケール</b>：原子 ≈ 10<sup>-10</sup> m、原子核 ≈ 10<sup>-15</sup> m。実寸だと原子核は1ピクセルの10万分の1なので、
+      パネルごとに倍率を変えています。<b>誇張しているのは倍率だけ</b>で、各パネルには実スケールバーと原子パネルに対する倍率を出しています。</li>
+    </ul>
+  </details>
+
+  <details>
+    <summary>実測値（このコードが実際に出した数字）</summary>
+    <p><b>① 電子 VMC 全エネルギー（Hartree）</b>　厳密値は非相対論的極限の文献値
+    [Chakravorty <i>et al.</i>, PRA 47, 3649 (1993)]。E<sub>VMC</sub> ≥ E<sub>厳密</sub> が変分原理。</p>
+    <table>
+      <tr><th>系</th><th>電子数</th><th>E<sub>VMC</sub></th><th>E<sub>厳密</sub></th><th>誤差</th></tr>
+      <tr><td>H</td><td>1</td><td>-0.5000</td><td>-0.5000</td><td>0.00%</td></tr>
+      <tr><td>He</td><td>2</td><td>-2.8573</td><td>-2.9037</td><td>1.60%</td></tr>
+      <tr><td>O</td><td>8</td><td>-73.856</td><td>-75.067</td><td>1.61%</td></tr>
+      <tr><td>Ne</td><td>10</td><td>-126.795</td><td>-128.938</td><td>1.66%</td></tr>
+      <tr><td>Ar</td><td>18</td><td>-516.807</td><td>-527.540</td><td>2.03%</td></tr>
+      <tr><td>H₂</td><td>2</td><td>-1.1071</td><td>-1.1745</td><td>5.74%</td></tr>
+      <tr><td>H₂O</td><td>10</td><td>-72.300</td><td>-76.438</td><td>5.41%</td></tr>
+      <tr><td>O₂</td><td>16</td><td>-147.593</td><td>-150.327</td><td>1.82%</td></tr>
+      <tr><td>N₂</td><td>14</td><td>-107.411</td><td>-109.542</td><td>1.95%</td></tr>
+      <tr><td>CH₄</td><td>10</td><td>-38.356</td><td>-40.515</td><td>5.33%</td></tr>
+      <tr><td>NH₃</td><td>10</td><td>-52.251</td><td>-56.564</td><td>7.62%</td></tr>
+      <tr><td>HF</td><td>10</td><td>-95.274</td><td>-100.459</td><td>5.16%</td></tr>
+      <tr><td>CO</td><td>14</td><td>-108.842</td><td>-113.317</td><td>3.95%</td></tr>
+    </table>
+    <p>H₂ は分離した水素原子2個（-1.0000）より低い＝<b>化学結合がモデルから出てきている</b>（結合エネルギー 0.107 Ha = 2.9 eV、実験値 4.75 eV）。</p>
+
+    <p><b>② 原子核 QMD 基底状態</b>　パラメータは α, β, γ（核物質の飽和条件で決まる）を固定したまま、
+    L, C<sub>p</sub>, q₀, p₀, C<sub>z</sub>, a<sub>z</sub>, C<sub>s</sub> を座標降下で下の2列だけに合わせたもの（相対誤差RMS 6.5%）。</p>
+    <table>
+      <tr><th>核種</th><th>E/A モデル</th><th>E/A 実験</th><th>誤差</th><th>r<sub>rms</sub> モデル</th><th>r<sub>rms</sub> 実験</th><th>誤差</th></tr>
+      <tr><td>He-4</td><td>-5.597</td><td>-7.074</td><td>+20.9%</td><td>1.232</td><td>1.428</td><td>-13.7%</td></tr>
+      <tr><td>Be-9</td><td>-6.906</td><td>-6.463</td><td>-6.9%</td><td>2.264</td><td>2.361</td><td>-4.1%</td></tr>
+      <tr><td>C-12</td><td>-7.693</td><td>-7.680</td><td>-0.2%</td><td>2.229</td><td>2.309</td><td>-3.5%</td></tr>
+      <tr><td>O-16</td><td>-8.097</td><td>-7.976</td><td>-1.5%</td><td>2.415</td><td>2.553</td><td>-5.4%</td></tr>
+      <tr><td>Ne-20</td><td>-8.261</td><td>-8.032</td><td>-2.9%</td><td>2.727</td><td>2.875</td><td>-5.1%</td></tr>
+      <tr><td>Mg-24</td><td>-8.284</td><td>-8.261</td><td>-0.3%</td><td>3.010</td><td>2.929</td><td>+2.8%</td></tr>
+      <tr><td>Si-28</td><td>-8.413</td><td>-8.448</td><td>+0.4%</td><td>3.131</td><td>2.997</td><td>+4.5%</td></tr>
+      <tr><td>S-32</td><td>-8.480</td><td>-8.493</td><td>+0.2%</td><td>3.262</td><td>3.141</td><td>+3.9%</td></tr>
+      <tr><td>Ar-40</td><td>-8.640</td><td>-8.595</td><td>-0.5%</td><td>3.507</td><td>3.313</td><td>+5.9%</td></tr>
+    </table>
+    <p>単位は MeV と fm。実験の r<sub>rms</sub> は電荷半径から陽子自身の大きさを差し引いた点核子半径
+    √(R<sub>ch</sub>² − 0.769 fm²)。</p>
+
+    <p><b>③ クォーク（基底のピンホイール、n = 1）</b></p>
+    <table>
+      <tr><th>量</th><th>値</th><th>備考</th></tr>
+      <tr><td>核子質量</td><td>938.918 MeV</td><td>V₀ をこれに合わせて1回だけ決定</td></tr>
+      <tr><td>V₀</td><td>-1581.5 MeV</td><td>構成子クォーク模型の加算定数</td></tr>
+      <tr><td>軌道半径 R</td><td>0.3677 fm</td><td>(A)+(B) から導出、手入力なし</td></tr>
+      <tr><td>運動量 p</td><td>536.7 MeV/c</td><td>同上</td></tr>
+      <tr><td>速度 v/c</td><td>0.848</td><td>だから相対論が必要</td></tr>
+      <tr><td>ストリング長 L<sub>Y</sub></td><td>1.103 fm</td><td>= 3R</td></tr>
+      <tr><td>エネルギー保存</td><td>1.0 × 10<sup>-13</sup></td><td>40万ステップ後の相対ドリフト</td></tr>
+    </table>
+    <p>核の時間発展のエネルギー保存も同様に測っていて、Δt = 0.20 fm/c で4000ステップ後の相対ドリフトは 3.9 × 10<sup>-5</sup>
+    （画面の <code>dE</code> がその実測値です）。</p>
+  </details>
+
+  <p class="sub">ソース: <a href="https://github.com/yomei-o/universe_cpp">github.com/yomei-o/universe_cpp</a>　·
+  <a href="../">ギャラリーに戻る</a></p>
+
+<script src="sim.js"></script>
+<script>
+"use strict";
+
+// system list must match the order built by build_systems() in atom_os.cpp
+const SYSTEMS = [
+  "H","He","Li","Be","B","C","N","O","F","Ne","Na","Mg","Al","Si","P","S","Cl","Ar",
+  "H2","H2O","O2","N2","CH4","NH3","HF","CO"
+];
+const DEFAULT_SYS = 7;      // oxygen
+
+const SLIDERS = [
+  { id:2, label:"原子ビューの拡大",   min:0.4, max:3.0,  step:0.05, val:1.0,   dec:2 },
+  { id:1, label:"表示する軌道 (0=全電子雲)", min:0, max:12, step:1, val:0,    dec:0 },
+  { id:3, label:"視点の自動回転",     min:0.0, max:1.5,  step:0.05, val:0.0,   dec:2 },
+  { id:7, label:"電子雲の残像",       min:0.80,max:0.995,step:0.005,val:0.965, dec:3 },
+  { id:8, label:"1フレームのVMC掃引", min:1,   max:6,    step:1,    val:1,     dec:0 },
+  { id:4, label:"核の励起 E* MeV/A",  min:0.0, max:6.0,  step:0.1,  val:1.2,   dec:1 },
+  { id:5, label:"核の集団回転 ω",     min:0.0, max:0.03, step:0.001,val:0.0,   dec:3 },
+  { id:6, label:"クォーク量子数 n",   min:1,   max:5,    step:1,    val:1,     dec:0 },
+  { id:9, label:"クォークの形の揺らぎ", min:0.0, max:0.06, step:0.002,val:0.0,   dec:3 },
+];
+const BUTTONS = [
+  { action:0, label:"表示切替 (3階層/原子/核/核子)" },
+  { action:1, label:"核の相互作用線" },
+  { action:2, label:"軌跡" },
+  { action:3, label:"陽子 / 中性子" },
+  { action:4, label:"核を再緩和" },
+  { action:5, label:"視点リセット" },
+  { action:6, label:"波動関数を再最適化 (数秒)" },
+];
+
+const $=id=>document.getElementById(id);
+const cv=$("cv"), ctx=cv.getContext("2d"), panel=$("panel"), statusEl=$("status");
+let M=null, api={}, W=0, H=0, img=null, playing=true, frames=0, lastT=0, fpsAvg=0;
+
+createSim().then(mod=>{
+  M=mod;
+  api.init  =M.cwrap("sim_init","number",["number","number"]);
+  api.w     =M.cwrap("sim_w","number",[]);
+  api.h     =M.cwrap("sim_h","number",[]);
+  api.reset =M.cwrap("sim_reset",null,[]);
+  api.step  =M.cwrap("sim_step",null,["number"]);
+  api.render=M.cwrap("sim_render","number",[]);
+  api.click =M.cwrap("sim_click",null,["number","number"]);
+  api.set   =M.cwrap("sim_set",null,["number","number"]);
+  api.action=M.cwrap("sim_action",null,["number"]);
+  statusEl.textContent="初期化中（変分パラメータ適用・核の基底状態を緩和）…";
+  api.init(0,0);          // sim_init already starts on the default system
+  W=api.w(); H=api.h(); cv.width=W; cv.height=H; img=ctx.createImageData(W,H);
+  buildPanel();
+  SLIDERS.forEach(s=>api.set(s.id, s.val));
+  loop();
+});
+
+function buildPanel(){
+  // system selector
+  const wrap=document.createElement("label"); wrap.className="ctl";
+  wrap.style.minWidth="190px";
+  const head=document.createElement("span"); head.innerHTML="<b>元素 / 分子</b>";
+  const sel=document.createElement("select");
+  SYSTEMS.forEach((n,i)=>{ const o=document.createElement("option"); o.value=i; o.textContent=n; sel.appendChild(o); });
+  sel.value=DEFAULT_SYS;
+  sel.addEventListener("change",()=>{
+    statusEl.textContent="切替中（核の基底状態を緩和）…";
+    setTimeout(()=>{ api.set(0, +sel.value); frames=0; blit(); }, 20);
+  });
+  wrap.appendChild(head); wrap.appendChild(sel); panel.appendChild(wrap);
+
+  SLIDERS.forEach(s=>{
+    const w=document.createElement("label"); w.className="ctl";
+    const h=document.createElement("span"); h.innerHTML=`${s.label} <b id="v${s.id}">${(+s.val).toFixed(s.dec)}</b>`;
+    const inp=document.createElement("input"); inp.type="range";
+    inp.min=s.min; inp.max=s.max; inp.step=s.step; inp.value=s.val;
+    inp.addEventListener("input",()=>{ $("v"+s.id).textContent=(+inp.value).toFixed(s.dec); if(M)api.set(s.id,+inp.value); });
+    w.appendChild(h); w.appendChild(inp); panel.appendChild(w);
+  });
+  BUTTONS.forEach(b=>{
+    const btn=document.createElement("button"); btn.textContent=b.label;
+    btn.addEventListener("click",()=>{ if(!M)return;
+      if(b.action===6||b.action===4){ statusEl.textContent="計算中…"; setTimeout(()=>{api.action(b.action);},20); }
+      else api.action(b.action);
+    });
+    panel.appendChild(btn);
+  });
+  const pp=document.createElement("button"); pp.className="primary"; pp.textContent="⏸ 一時停止";
+  pp.addEventListener("click",()=>{ playing=!playing; pp.textContent=playing?"⏸ 一時停止":"▶ 再生";
+                                    if(playing){lastT=0;loop();} });
+  panel.appendChild(pp);
+  const rs=document.createElement("button"); rs.textContent="⟲ リセット";
+  rs.addEventListener("click",()=>{ statusEl.textContent="計算中…";
+      setTimeout(()=>{ api.reset(); frames=0; if(!playing){blit();} },20); });
+  panel.appendChild(rs);
+}
+
+function blit(){ const p=api.render(); img.data.set(M.HEAPU8.subarray(p,p+W*H*4)); ctx.putImageData(img,0,0); }
+
+function loop(ts){
+  if(!playing) return;
+  api.step(1); blit(); frames++;
+  if(lastT){ const f=1000/(ts-lastT); fpsAvg = fpsAvg? fpsAvg*0.9+f*0.1 : f; }
+  lastT=ts;
+  statusEl.textContent=`frame ${frames}   ${fpsAvg.toFixed(0)} fps   `
+    + `— 原子パネルをドラッグで視点回転、原子核をクリックでその核を表示、核子をクリックでそのクォークを表示`;
+  requestAnimationFrame(loop);
+}
+
+let down=false;
+const emit=e=>{ const r=cv.getBoundingClientRect();
+  api.click((e.clientX-r.left)/r.width, (e.clientY-r.top)/r.height); };
+cv.addEventListener("pointerdown",e=>{ down=true; if(M)emit(e); });
+cv.addEventListener("pointermove",e=>{ if(down&&M)emit(e); });
+window.addEventListener("pointerup",()=>{ down=false; if(M)api.click(-1,-1); });
+</script>
+</body>
+</html>
