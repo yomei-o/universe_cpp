@@ -488,8 +488,30 @@ static void jastrow_deriv(const Walker& w, int i, const double* rp, double* gr, 
     *lp = L;
 }
 
-// position dependent time step: small near a nucleus, tau0 far away
-static double g_tau0 = 0.25;
+// ---------------------------------------------------------------------------
+// Metropolis time step.  Position dependent (small near a nucleus, tau0 far
+// away), and two base values are used.  BOTH sample |Psi_T|^2 exactly, because
+// the accept/reject step makes the stationary distribution independent of tau.
+// What tau changes is the character of the walk:
+//
+//   TAU_CLOUD = 0.25   big jumps.  Decorrelates fast, so the accumulated
+//                      density and the energy converge quickly.  Successive
+//                      positions are NOT a path - they are near-independent
+//                      samples, and joining them with lines would be a lie.
+//   TAU_PART  = 0.010  small steps.  Now the sequence of positions IS a genuine
+//                      sample path of the Fokker-Planck diffusion whose
+//                      stationary density is |Psi_T|^2, so it can honestly be
+//                      drawn as a moving particle with a trail.  The drift term
+//                      D tau grad ln|Psi|^2 is exactly what pulls the electrons
+//                      in towards the nucleus.  The price is a much longer
+//                      correlation time, so the energy converges more slowly.
+//
+// Neither is "the real motion of an electron": a stationary state has no
+// classical trajectory at all.  This is the diffusion process that carries the
+// correct distribution, which is the honest particle picture of a bound electron.
+// ---------------------------------------------------------------------------
+static const double TAU_CLOUD = 0.25, TAU_PART = 0.010;
+static double g_tau0 = TAU_CLOUD;
 static inline double tau_at(const double* r)
 {
     double best = 1e30; int ib = 0;
@@ -1778,6 +1800,8 @@ static double g_persist = 0.994;
 static int    g_sweeps  = 2;
 static bool   g_bonds   = true;
 static bool   g_trails  = true;
+static int    g_dispmode = 0;   // 0 cloud, 1 particles, 2 both
+static const int TRDRAW = 13;   // trail points actually drawn
 static int    g_selatom = 0;
 static double g_viewR   = 4.0;    // half width of the atom panel, in bohr
 static bool   g_busy    = false;
@@ -1927,6 +1951,7 @@ static void draw_atom(Olivec_Canvas oc)
 
     // auto exposure: the accumulated counts depend on walker number, persistence
     // and zoom, so normalise by a smoothed peak instead of a magic gain
+    if (g_dispmode != 1) {
     float peak = 0.0f;
     for (int y = R.y; y < R.y + R.h; ++y) {
         const float* d = &g_dens[(size_t)y * FW];
@@ -1959,6 +1984,7 @@ static void draw_atom(Olivec_Canvas oc)
             uint32_t c = rgba(r, g, b, 1.f);
             olivec_blend_color(&px[x], c);
         }
+    }
     }
 
     // selected orbital: accumulate |phi|^2 into two buffers, one per sign of
@@ -2000,20 +2026,50 @@ static void draw_atom(Olivec_Canvas oc)
         }
     }
 
-    // Snapshot of where the point electrons are right now, for every walker.
-    // These are samples of |Psi|^2, NOT trajectories - a Metropolis step is a
-    // jump, not a path - so they are deliberately drawn as dots and never
-    // joined up with lines.
-    int ndot = (g_orbview > 0) ? 2 : std::min(g_nw, 10);
-    for (int wi = 0; wi < ndot; ++wi) {
-        const Walker& w = g_w[wi];
-        if (!w.ok) continue;
-        for (int i = 0; i < g_nel; ++i) {
-            bool up = (i < g_nup);
-            Proj p = project(w.r[i], cx, cy, sc);
-            if (p.sx < R.x || p.sx >= R.x + R.w || p.sy < R.y || p.sy >= R.y + R.h) continue;
-            olivec_circle(oc, (int)p.sx, (int)p.sy, 1,
-                          up ? rgba(220, 255, 250, 0.42f) : rgba(255, 215, 255, 0.42f));
+    // ---- the point electrons themselves ----
+    if (g_dispmode == 0) {
+        // cloud mode: tau is large, so successive positions are near-independent
+        // samples, not a path.  Draw them as dots and never join them up.
+        int ndot = (g_orbview > 0) ? 2 : std::min(g_nw, 10);
+        for (int wi = 0; wi < ndot; ++wi) {
+            const Walker& w = g_w[wi];
+            if (!w.ok) continue;
+            for (int i = 0; i < g_nel; ++i) {
+                bool up = (i < g_nup);
+                Proj p = project(w.r[i], cx, cy, sc);
+                if (p.sx < R.x || p.sx >= R.x + R.w || p.sy < R.y || p.sy >= R.y + R.h) continue;
+                olivec_circle(oc, (int)p.sx, (int)p.sy, 1,
+                              up ? rgba(220, 255, 250, 0.42f) : rgba(255, 215, 255, 0.42f));
+            }
+        }
+    } else {
+        // particle mode: tau is small, so the sequence of positions is a real
+        // sample path of the diffusion.  Every electron of every walker is drawn
+        // as a moving particle with its recent path behind it.
+        for (int wi = 0; wi < g_nw; ++wi) {
+            const Walker& w = g_w[wi];
+            if (!w.ok) continue;
+            for (int i = 0; i < g_nel; ++i) {
+                bool up = (i < g_nup);
+                if (g_trails)
+                    for (int t = 1; t < TRDRAW; ++t) {
+                        int a0 = (w.tn - t + 2 * NTRAIL) % NTRAIL;
+                        int a1 = (w.tn - t + 1 + 2 * NTRAIL) % NTRAIL;
+                        float p0[3] = {w.tx[i][a0], w.ty[i][a0], w.tz[i][a0]};
+                        float p1[3] = {w.tx[i][a1], w.ty[i][a1], w.tz[i][a1]};
+                        Proj q0 = projectf(p0, cx, cy, sc), q1 = projectf(p1, cx, cy, sc);
+                        float al = 0.34f * (1.0f - (float)t / TRDRAW);
+                        olivec_line(oc, (int)q0.sx, (int)q0.sy, (int)q1.sx, (int)q1.sy,
+                                    up ? rgba(120, 255, 225, al) : rgba(255, 150, 250, al));
+                    }
+                Proj p = project(w.r[i], cx, cy, sc);
+                if (p.sx < R.x || p.sx >= R.x + R.w || p.sy < R.y || p.sy >= R.y + R.h) continue;
+                float sh = (float)(0.55 + 0.45 / (1.0 + std::exp(-p.dz * 0.5)));
+                olivec_circle(oc, (int)p.sx, (int)p.sy, 3,
+                              up ? rgba(80, 255, 220, 0.16f * sh) : rgba(255, 130, 250, 0.16f * sh));
+                olivec_circle(oc, (int)p.sx, (int)p.sy, 1,
+                              up ? rgba(200, 255, 245, 0.92f * sh) : rgba(255, 205, 255, 0.92f * sh));
+            }
         }
     }
 
@@ -2072,6 +2128,9 @@ static void draw_atom(Olivec_Canvas oc)
         txt(oc, b, R.x + 8, ty, 1, rgba(255, 190, 90, 0.95f)); ty += dy;
         txt(oc, "cyan and orange are the two signs of phi", R.x + 8, ty, 1, rgba(205, 155, 75, 0.9f));
     }
+    if (g_dispmode != 0)
+        txt(oc, "particle mode  small tau, so the trail is a real diffusion path,"
+                " not a classical orbit", R.x + 8, R.y + R.h - 50, 1, rgba(120, 200, 190, 0.85f));
     scale_bar(oc, R, sc / 52.917721, "pm", cd);
     std::snprintf(b, sizeof(b), "1 px = %.1f pm", 52.917721 / sc);
     txt(oc, b, R.x + 12, R.y + R.h - 34, 1, cd);
@@ -2341,6 +2400,23 @@ KEEP void sim_set(int id, double v)
     case 7: g_persist = v; break;
     case 8: g_sweeps = std::max(1, std::min(6, (int)(v + 0.5))); break;
     case 9: if (std::fabs(v - g_qwob) > 1e-9) { g_qwob = v; quark_setup(g_qIsProton != 0, true); } break;
+    case 10: { int m = (int)(v + 0.5); if (m < 0) m = 0; if (m > 2) m = 2;
+               if (m != g_dispmode) {
+                   g_dispmode = m;
+                   // switching tau does not change the sampled distribution, only
+                   // the correlation time, so no re-equilibration is needed
+                   g_tau0 = (m == 0) ? TAU_CLOUD : TAU_PART;
+                   for (int i = 0; i < g_nw; ++i) {   // start the trails at the current point
+                       Walker& w = g_w[i]; w.tn = 0;
+                       for (int q = 0; q < g_nel; ++q)
+                           for (int t = 0; t < NTRAIL; ++t) {
+                               w.tx[q][t] = (float)w.r[q][0];
+                               w.ty[q][t] = (float)w.r[q][1];
+                               w.tz[q][t] = (float)w.r[q][2];
+                           }
+                   }
+                   stat_clear();
+               } } break;
     default: break;
     }
 }
@@ -2357,6 +2433,31 @@ KEEP void sim_action(int id)
     case 2: g_trails = !g_trails; break;
     case 3: quark_setup(g_qIsProton == 0, false); break;
     case 4: { int Z = g_at[g_selatom].Z; nucleus_setup(Z, ELEM[Z].A, true); } break;
+    case 7: {   // scatter the electrons far out and let the drift pull them back
+        for (int i = 0; i < g_nw; ++i) {
+            Walker& w = g_w[i];
+            for (int q = 0; q < g_nel; ++q) {
+                int at = g_ao[mo_main_ao((q < g_nup) ? g_occup[q] : g_occdn[q - g_nup])].at;
+                double u = urand() * 2.0 - 1.0, ph = urand() * 2.0 * M_PI;
+                double st = std::sqrt(std::max(0.0, 1.0 - u * u));
+                double rr = g_viewR * (0.75 + 0.5 * urand());
+                w.r[q][0] = g_at[at].R[0] + rr * st * std::cos(ph);
+                w.r[q][1] = g_at[at].R[1] + rr * st * std::sin(ph);
+                w.r[q][2] = g_at[at].R[2] + rr * u;
+            }
+            build_slater(w);
+            w.tn = 0;
+            for (int q = 0; q < g_nel; ++q)
+                for (int t = 0; t < NTRAIL; ++t) {
+                    w.tx[q][t] = (float)w.r[q][0];
+                    w.ty[q][t] = (float)w.r[q][1];
+                    w.tz[q][t] = (float)w.r[q][2];
+                }
+        }
+        std::fill(g_dens.begin(), g_dens.end(), 0.0f);
+        std::fill(g_densU.begin(), g_densU.end(), 0.0f);
+        stat_clear();
+    } break;
     case 6: g_busy = true; vmc_optimise(); vmc_reset_walkers();
             for (int s = 0; s < 400; ++s) for (int i = 0; i < g_nw; ++i) vmc_sweep(g_w[i]);
             stat_clear(); g_busy = false; break;
@@ -2431,6 +2532,18 @@ KEEP void sim_step(int n)
                     if (std::isfinite(e)) { g_w[i].eloc = e; stat_add(e); }
                 }
             }
+        // one trail sample per rendered frame, for every walker
+        if (g_dispmode != 0) {
+            for (int i = 0; i < g_nw; ++i) {
+                Walker& w = g_w[i];
+                w.tn = (w.tn + 1) % NTRAIL;
+                for (int q = 0; q < g_nel; ++q) {
+                    w.tx[q][w.tn] = (float)w.r[q][0];
+                    w.ty[q][w.tn] = (float)w.r[q][1];
+                    w.tz[q][w.tn] = (float)w.r[q][2];
+                }
+            }
+        }
         for (int k = 0; k < 8; ++k) qmd_step(g_ndt);
         for (int k = 0; k < 34; ++k) quark_step(g_qdt);
         g_yaw += g_rotspd * 0.012;
@@ -2726,9 +2839,12 @@ int main(int argc, char** argv)
         int nst = argc > 3 ? atoi(argv[3]) : 400;
         int orb = argc > 4 ? atoi(argv[4]) : 0;
         int foc = argc > 5 ? atoi(argv[5]) : 0;
+        int dm  = argc > 6 ? atoi(argv[6]) : 0;
         g_sysid = sys;
         sim_init(0, 0);
+        sim_set(10, dm);
         sim_set(1, orb);
+        if (argc > 7 && atoi(argv[7])) { for (int f = 0; f < 120; ++f) sim_step(1); sim_action(7); }
         g_focus = foc; layout();
         // render every frame, like the browser does, so the accumulated
         // electron-density buffer actually builds up
@@ -2738,6 +2854,33 @@ int main(int argc, char** argv)
         stbi_write_png(fn, FW, FH, 4, px, FW * 4);
         std::printf("wrote %s   %s  Nel %d  E %.4f (exact %.4f)\n", fn, SYS[sys].name, g_nel,
                     g_ecnt ? g_esum / g_ecnt : 0.0, SYS[sys].Eref);
+        return 0;
+    }
+    if (!std::strcmp(mode, "fall")) {
+        // drop the electrons in from outside and watch the drift term pull them
+        // back to the equilibrium distribution
+        int sys = argc > 2 ? atoi(argv[2]) : 7;
+        g_sysid = sys;
+        sim_init(0, 0);
+        sim_set(10, 1);                       // particle mode
+        for (int f = 0; f < 200; ++f) { sim_step(1); }
+        auto meanr = [&]() {
+            double s2 = 0; long c = 0;
+            for (int w = 0; w < g_nw; ++w)
+                for (int i = 0; i < g_nel; ++i) {
+                    double* r = g_w[w].r[i];
+                    s2 += std::sqrt(r[0] * r[0] + r[1] * r[1] + r[2] * r[2]); c++;
+                }
+            return c ? s2 / c : 0.0;
+        };
+        std::printf("%s   equilibrium <r> = %.3f bohr   viewR %.2f\n", SYS[sys].name, meanr(), g_viewR);
+        sim_action(7);
+        std::printf("dropped in from <r> = %.3f bohr\n", meanr());
+        std::printf("%6s %10s\n", "frame", "<r> bohr");
+        for (int f = 0; f <= 400; ++f) {
+            if (f % 25 == 0) std::printf("%6d %10.3f\n", f, meanr());
+            sim_step(1);
+        }
         return 0;
     }
     if (!std::strcmp(mode, "opt")) { emit_param_table(); return 0; }
