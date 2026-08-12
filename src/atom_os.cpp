@@ -605,7 +605,16 @@ static void vmc_sweep(Walker& w)
 }
 
 // local energy of one walker
-static double local_energy(Walker& w)
+// The Coulomb forces enter here, exactly and with no cut-off:
+//   ven  = -sum_A Z_A / |r_i - R_A|      electron-nucleus attraction
+//   vee  = +sum_{i<j} 1 / r_ij           electron-electron repulsion
+//   g_enuc                               nucleus-nucleus repulsion
+// Optional out-parameters expose the three pieces separately so they can be
+// checked against the virial theorem (see the "coul" test mode).
+static double local_energy(Walker& w, double* Tout, double* Venout, double* Veeout);
+static double local_energy(Walker& w) { return local_energy(w, nullptr, nullptr, nullptr); }
+
+static double local_energy(Walker& w, double* Tout, double* Venout, double* Veeout)
 {
     if (!w.ok) return 0.0;
     double kin = 0.0, ven = 0.0, vee = 0.0;
@@ -637,6 +646,9 @@ static double local_energy(Walker& w)
             vee += 1.0 / d;
         }
     }
+    if (Tout) *Tout = kin;
+    if (Venout) *Venout = ven;
+    if (Veeout) *Veeout = vee;
     return kin + ven + vee + g_enuc;
 }
 
@@ -975,19 +987,75 @@ static void vmc_reset_walkers()
 }
 
 // short VMC run used only by the variational scan below
-static double vmc_trial_energy(int equil, int samp, int nw)
+static double vmc_trial_energy(int equil, int samp, int nw, double* Tout = nullptr, double* Vout = nullptr)
 {
     int save = g_nw; g_nw = nw;
     vmc_reset_walkers();
     for (int s = 0; s < equil; ++s) for (int i = 0; i < nw; ++i) vmc_sweep(g_w[i]);
-    double s1 = 0.0; long c = 0;
+    double s1 = 0.0, sT = 0.0, sV = 0.0; long c = 0;
     for (int s = 0; s < samp; ++s)
         for (int i = 0; i < nw; ++i) {
             vmc_sweep(g_w[i]);
-            if (g_w[i].ok) { double e = local_energy(g_w[i]); if (std::isfinite(e)) { s1 += e; c++; } }
+            if (!g_w[i].ok) continue;
+            double T, Ven, Vee;
+            double e = local_energy(g_w[i], &T, &Ven, &Vee);
+            if (!std::isfinite(e)) continue;
+            s1 += e; sT += T; sV += Ven + Vee + g_enuc; c++;
         }
     g_nw = save;
+    if (Tout) *Tout = c ? sT / c : 0.0;
+    if (Vout) *Vout = c ? sV / c : 0.0;
     return c ? s1 / c : 0.0;
+}
+
+// ---------------------------------------------------------------------------
+// Virial refinement of the overall length scale.
+//
+// For a pure Coulomb system, scaling every length by 1/s sends
+//     <T> -> s^2 <T>      and      <V> -> s <V>
+// so E(s) = s^2 <T> + s <V> is minimised at
+//     s* = -<V> / (2 <T>)
+// and there -<V>/<T> = 2, which is the virial theorem.  Both are exact
+// statements about Coulomb systems, so the best overall length scale can be
+// READ OFF a measurement instead of searched for on a grid - and how far
+// -<V>/<T> sits from 2 is a direct measure of the trial function's quality.
+//
+// s* is measured, so it carries statistical noise and iterating it blindly
+// oscillates.  Each step is damped, and the best energy seen is kept.
+// ---------------------------------------------------------------------------
+static void vmc_virial_refine(int iters, int equil, int samp, int nw, uint64_t seed)
+{
+    double bz[4], bjb = g_jb, bzp = g_zp, bzh = g_zh, bhyb = g_hyb, best = 1e300;
+    for (int q = 0; q < 4; ++q) bz[q] = g_zs[q];
+    double cum = 1.0;                    // cumulative scale, kept on a short leash
+    for (int it = 0; it < iters; ++it) {
+        double T = 0, V = 0;
+        g_rs = seed; g_ghas = false;
+        double E = vmc_trial_energy(equil, samp, nw, &T, &V);
+        if (!std::isfinite(E) || T <= 0.0) break;
+        if (E < best) {
+            best = E;
+            for (int q = 0; q < 4; ++q) bz[q] = g_zs[q];
+            bjb = g_jb; bzp = g_zp; bzh = g_zh; bhyb = g_hyb;
+        }
+        double s = -V / (2.0 * T);
+        if (!std::isfinite(s)) break;
+        s = 1.0 + 0.5 * (s - 1.0);                    // damped against the noise in s*
+        if (s < 0.94) s = 0.94;
+        if (s > 1.07) s = 1.07;
+        // s* is a measured quantity; a few noisy steps must not be able to walk
+        // the length scale somewhere silly, so cap the cumulative change
+        if (cum * s > 1.09) s = 1.09 / cum;
+        if (cum * s < 0.93) s = 0.93 / cum;
+        if (std::fabs(s - 1.0) < 2e-3) break;
+        cum *= s;
+        for (int q = 1; q <= 3; ++q) g_zs[q] *= s;
+        g_jb *= s;
+        setup_electrons(g_sysid);
+    }
+    for (int q = 0; q < 4; ++q) g_zs[q] = bz[q];
+    g_jb = bjb; g_zp = bzp; g_zh = bzh; g_hyb = bhyb;
+    setup_electrons(g_sysid);
 }
 
 // ---------------------------------------------------------------------------
@@ -1047,6 +1115,32 @@ static void vmc_optimise()
             *pp.p = bv;
         }
         if (!moved) break;
+    }
+    // Finish with the virial scaling, which fixes the one thing a coarse grid is
+    // worst at: the overall length scale.  s* is a measured quantity though, so
+    // the refinement can land worse than where it started.  Judge it the only
+    // way that is allowed to decide anything here - the variational energy,
+    // measured for both candidates with the same seed and the same statistics -
+    // and keep the winner.  Never ships a worse trial function than the scan.
+    {
+        double az[4], ajb = g_jb, azp = g_zp, azh = g_zh, ahyb = g_hyb;
+        for (int q = 0; q < 4; ++q) az[q] = g_zs[q];
+        g_rs = seed; g_ghas = false;
+        double Ebefore = vmc_trial_energy(1200, 7000, 10);
+
+        vmc_virial_refine(3, 700, 4500, 8, seed);
+        double bz[4], bjb = g_jb, bzp = g_zp, bzh = g_zh, bhyb = g_hyb;
+        for (int q = 0; q < 4; ++q) bz[q] = g_zs[q];
+        g_rs = seed; g_ghas = false;
+        double Eafter = vmc_trial_energy(1200, 7000, 10);
+
+        bool keepNew = std::isfinite(Eafter) && Eafter < Ebefore;
+        for (int q = 0; q < 4; ++q) g_zs[q] = keepNew ? bz[q] : az[q];
+        g_jb  = keepNew ? bjb  : ajb;
+        g_zp  = keepNew ? bzp  : azp;
+        g_zh  = keepNew ? bzh  : azh;
+        g_hyb = keepNew ? bhyb : ahyb;
+        setup_electrons(g_sysid);
     }
     g_zscale = g_zs[nsh];
     g_rs = seed;
@@ -2295,28 +2389,28 @@ static void draw_nucleon(Olivec_Canvas oc)
 //        z1      z2      z3      zp      jb      lam     zh      hyb
 static const TrialParam TRIAL[] = {
     {1.0000, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // H
-    {0.9500, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // He
-    {1.0000, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // Li
+    {1.0247, 1.0786, 1.0786, 1.0000, 0.8629, 1.0000, 1.0000, 1.0000},   // He
+    {1.0292, 1.0292, 1.0292, 1.0000, 0.8234, 1.0000, 1.0000, 1.0000},   // Li
     {1.0000, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // Be
     {1.0000, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // B
-    {0.9500, 1.1100, 1.0000, 1.0000, 0.5000, 1.0000, 1.0000, 1.0000},   // C
-    {0.9500, 1.0500, 1.0000, 1.1100, 0.8000, 1.0000, 1.0000, 1.0000},   // N
-    {1.0000, 1.0500, 1.0000, 1.0000, 1.2000, 1.0000, 1.0000, 1.0000},   // O
-    {0.9500, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // F
+    {1.0087, 1.1786, 1.0618, 1.0000, 0.5309, 1.0000, 1.0000, 1.0000},   // C
+    {1.0165, 1.1235, 1.0700, 1.1100, 0.8560, 1.0000, 1.0000, 1.0000},   // N
+    {1.0190, 1.0700, 1.0190, 1.0000, 1.2228, 1.0000, 1.0000, 1.0000},   // O
+    {1.0355, 1.0900, 1.0900, 1.0000, 0.8720, 1.0000, 1.0000, 1.0000},   // F
     {1.1100, 1.0500, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // Ne
     {1.1100, 1.0500, 0.9000, 1.0000, 1.8000, 1.0000, 1.0000, 1.0000},   // Na
-    {1.1100, 1.1100, 1.0000, 1.1100, 0.8000, 1.0000, 1.0000, 1.0000},   // Mg
-    {0.9500, 1.1100, 1.0000, 1.0500, 0.3000, 1.0000, 1.0000, 1.0000},   // Al
+    {1.0739, 1.0739, 0.9675, 1.1100, 0.7740, 1.0000, 1.0000, 1.0000},   // Mg
+    {1.0355, 1.2099, 1.0900, 1.0500, 0.3270, 1.0000, 1.0000, 1.0000},   // Al
     {1.1100, 1.0500, 0.9000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // Si
-    {1.0000, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // P
+    {1.0900, 1.0900, 1.0900, 1.0000, 0.8720, 1.0000, 1.0000, 1.0000},   // P
     {1.1100, 1.1100, 0.9000, 1.0000, 1.8000, 1.0000, 1.0000, 1.0000},   // S
-    {0.9000, 1.1100, 0.9000, 1.1100, 0.8000, 1.0000, 1.0000, 1.0000},   // Cl
-    {1.1100, 1.1100, 1.0500, 0.9500, 0.8000, 1.0000, 1.0000, 1.0000},   // Ar
-    {1.0500, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // H2
-    {1.1100, 1.0500, 1.0000, 1.1100, 1.2000, 0.5500, 1.1200, 1.0000},   // H2O
+    {0.9810, 1.2099, 0.9810, 1.1100, 0.8720, 1.0000, 1.0000, 1.0000},   // Cl
+    {1.1336, 1.1336, 1.0723, 0.9500, 0.8170, 1.0000, 1.0000, 1.0000},   // Ar
+    {1.1445, 1.0900, 1.0900, 1.0000, 0.8720, 1.0000, 1.0000, 1.0000},   // H2
+    {1.0596, 1.0023, 0.9546, 1.1100, 1.1455, 0.5500, 1.1200, 1.0000},   // H2O
     {0.9500, 1.0500, 1.0000, 1.0500, 1.8000, 1.1500, 1.0000, 1.0000},   // O2
     {1.0000, 1.1100, 1.0000, 1.0500, 1.8000, 0.7500, 1.0000, 1.0000},   // N2
-    {0.9500, 0.9500, 1.0000, 1.0000, 1.8000, 1.1500, 1.0000, 1.3000},   // CH4
+    {1.0355, 1.0355, 1.0900, 1.0000, 1.9620, 1.1500, 1.0000, 1.3000},   // CH4
     {1.0000, 1.0000, 1.0000, 1.0000, 0.8000, 0.5500, 1.0000, 1.7000},   // NH3
     {1.1100, 1.0000, 1.0000, 1.0000, 0.8000, 1.0000, 1.0000, 1.0000},   // HF
     {0.9500, 1.1100, 1.0000, 1.0500, 1.8000, 1.1500, 1.0000, 1.0000},   // CO
@@ -2859,6 +2953,147 @@ int main(int argc, char** argv)
         stbi_write_png(fn, FW, FH, 4, px, FW * 4);
         std::printf("wrote %s   %s  Nel %d  E %.4f (exact %.4f)\n", fn, SYS[sys].name, g_nel,
                     g_ecnt ? g_esum / g_ecnt : 0.0, SYS[sys].Eref);
+        return 0;
+    }
+    if (!std::strcmp(mode, "virial")) {
+        // For a pure Coulomb system, scaling every length by 1/s sends
+        //   <T> -> s^2 <T>   and   <V> -> s <V>
+        // so E(s) = s^2 <T> + s <V> is minimised at  s* = -<V> / (2<T>),
+        // and at that point -<V>/<T> = 2, the virial theorem.  Both are exact
+        // statements about Coulomb systems, so s* can be read straight off a
+        // measurement instead of being searched for on a grid.
+        int sys = argc > 2 ? atoi(argv[2]) : 7;
+        long NS = argc > 3 ? atol(argv[3]) : 4000;
+        g_rs = 20260812ull; g_ghas = false;
+        g_sysid = sys;
+        setup_electrons(sys);
+        trial_load(sys);
+        std::printf("=== %s : virial scaling refinement ===\n", SYS[sys].name);
+        std::printf("%5s %12s %12s %10s %10s %10s\n", "iter", "E", "exact", "virial", "s*", "err%");
+        for (int it = 0; it <= 5; ++it) {
+            g_nw = 16; vmc_reset_walkers();
+            for (int e = 0; e < 2500; ++e) for (int i = 0; i < g_nw; ++i) vmc_sweep(g_w[i]);
+            double sT = 0, sVen = 0, sVee = 0, sE = 0; long c = 0;
+            for (long st = 0; st < NS; ++st)
+                for (int i = 0; i < g_nw; ++i) {
+                    vmc_sweep(g_w[i]);
+                    if (!g_w[i].ok) continue;
+                    double T, Ven, Vee;
+                    double E = local_energy(g_w[i], &T, &Ven, &Vee);
+                    if (!std::isfinite(E)) continue;
+                    sT += T; sVen += Ven; sVee += Vee; sE += E; c++;
+                }
+            double T = sT / c, V = (sVen + sVee) / c + g_enuc, E = sE / c;
+            double sstar = -V / (2.0 * T);
+            std::printf("%5d %12.5f %12.5f %10.4f %10.4f %9.2f%%\n", it, E, SYS[sys].Eref,
+                        -V / T, sstar, 100.0 * (E - SYS[sys].Eref) / std::fabs(SYS[sys].Eref));
+            if (it == 5) break;
+            // apply the scaling: every exponent up by s*, and the Jastrow length
+            // parameter with it, so the whole trial function is rescaled together
+            for (int q = 1; q <= 3; ++q) g_zs[q] *= sstar;
+            g_jb *= sstar;
+            setup_electrons(sys);
+        }
+        std::printf("scales now  z %.4f %.4f %.4f   b %.4f\n", g_zs[1], g_zs[2], g_zs[3], g_jb);
+        return 0;
+    }
+    if (!std::strcmp(mode, "coul")) {
+        // Are the Coulomb forces really in there, or is it "just probability"?
+        // Two checks that cannot pass by accident.
+        //
+        //  (1) VIRIAL THEOREM.  For a pure Coulomb system the exact ground state
+        //      obeys <T> = -E and <V> = 2E, so -<V>/<T> = 2.  The kinetic part
+        //      comes from the Laplacian of the wavefunction and the potential
+        //      part from the 1/r sums - separate code, so the ratio landing near
+        //      2 is a real test, and how far it is from 2 measures how good the
+        //      trial function is.
+        //
+        //  (2) PAIR CORRELATION g(r12) = P_same_walker(r12) / P_independent(r12).
+        //      The reference is built by pairing electrons taken from DIFFERENT
+        //      walkers: same one-particle density, no correlation at all.  So
+        //      any departure from 1 is correlation and nothing else.
+        //        parallel spins     -> g(0) = 0   exclusion principle (determinant)
+        //        antiparallel spins -> g(0) < 1   Coulomb repulsion (Jastrow)
+        //      Run with jastrow off (4th argument 1) and the antiparallel hole
+        //      must fill in, which shows the 1/r12 repulsion is what digs it.
+        int sys = argc > 2 ? atoi(argv[2]) : 7;
+        long NS = argc > 3 ? atol(argv[3]) : 20000;
+        int nojas = argc > 4 ? atoi(argv[4]) : 0;
+        g_rs = 20260812ull; g_ghas = false;
+        g_sysid = sys;
+        setup_electrons(sys);
+        trial_load(sys);
+        if (nojas) g_jb = 1e9;            // u(r) = r/(1+b r) -> 1/b -> 0 : no Jastrow
+        g_nw = 24; vmc_reset_walkers();
+        for (int e = 0; e < 4000; ++e) for (int i = 0; i < g_nw; ++i) vmc_sweep(g_w[i]);
+
+        const int NB = 30; const double RMAX = 6.0;
+        double hp[NB] = {0}, ha[NB] = {0}, rp2[NB] = {0}, ra[NB] = {0};
+        double sT = 0, sVen = 0, sVee = 0, sE = 0; long c = 0;
+        for (long st = 0; st < NS; ++st) {
+            for (int i = 0; i < g_nw; ++i) {
+                vmc_sweep(g_w[i]);
+                if (!g_w[i].ok) continue;
+                double T, Ven, Vee;
+                double E = local_energy(g_w[i], &T, &Ven, &Vee);
+                if (!std::isfinite(E)) continue;
+                sT += T; sVen += Ven; sVee += Vee; sE += E; c++;
+            }
+            // correlated pairs: both electrons from the same walker
+            for (int i = 0; i < g_nw; ++i) {
+                if (!g_w[i].ok) continue;
+                for (int a = 0; a < g_nel; ++a)
+                    for (int b = a + 1; b < g_nel; ++b) {
+                        double dx = g_w[i].r[a][0] - g_w[i].r[b][0];
+                        double dy = g_w[i].r[a][1] - g_w[i].r[b][1];
+                        double dz = g_w[i].r[a][2] - g_w[i].r[b][2];
+                        int bin = (int)(std::sqrt(dx * dx + dy * dy + dz * dz) / RMAX * NB);
+                        if (bin < 0 || bin >= NB) continue;
+                        if (spin_of(a) == spin_of(b)) hp[bin] += 1.0; else ha[bin] += 1.0;
+                    }
+            }
+            // reference: the SAME electron labels but from two different walkers,
+            // so the one-particle density is identical and the correlation is gone
+            for (int i = 0; i < g_nw; ++i) {
+                int j = (i + 1 + (int)(urand() * (g_nw - 1))) % g_nw;
+                if (j == i || !g_w[i].ok || !g_w[j].ok) continue;
+                for (int a = 0; a < g_nel; ++a)
+                    for (int b = a + 1; b < g_nel; ++b) {
+                        double dx = g_w[i].r[a][0] - g_w[j].r[b][0];
+                        double dy = g_w[i].r[a][1] - g_w[j].r[b][1];
+                        double dz = g_w[i].r[a][2] - g_w[j].r[b][2];
+                        int bin = (int)(std::sqrt(dx * dx + dy * dy + dz * dz) / RMAX * NB);
+                        if (bin < 0 || bin >= NB) continue;
+                        if (spin_of(a) == spin_of(b)) rp2[bin] += 1.0; else ra[bin] += 1.0;
+                    }
+            }
+        }
+        double T = sT / c, Ven = sVen / c, Vee = sVee / c, E = sE / c;
+        double V = Ven + Vee + g_enuc;
+        std::printf("=== %s%s : the pieces of the energy (Hartree) ===\n",
+                    SYS[sys].name, nojas ? "  (Jastrow OFF)" : "");
+        std::printf("  <T>    kinetic, from the Laplacian    %12.5f\n", T);
+        std::printf("  <Ven>  electron-nucleus attraction    %12.5f\n", Ven);
+        std::printf("  <Vee>  electron-electron repulsion    %12.5f\n", Vee);
+        if (g_enuc != 0.0)
+            std::printf("  Vnn    nucleus-nucleus repulsion      %12.5f\n", g_enuc);
+        std::printf("  <E>    total                          %12.5f   (exact %.5f)\n", E, SYS[sys].Eref);
+        std::printf("  virial  -<V>/<T> = %.4f   (exactly 2 for the true ground state)\n", -V / T);
+        std::printf("  virial-optimal uniform scale s = -<V>/(2<T>) = %.4f\n", -V / (2.0 * T));
+
+        std::printf("\n=== pair correlation  g(r12) = P(same walker) / P(independent walkers) ===\n");
+        std::printf("%9s %14s %14s\n", "r12 bohr", "parallel", "antiparallel");
+        double dr = RMAX / NB;
+        double sp = 0, sa = 0, srp = 0, sra = 0;
+        for (int b = 0; b < NB; ++b) { sp += hp[b]; sa += ha[b]; srp += rp2[b]; sra += ra[b]; }
+        for (int b = 0; b < NB; ++b) {
+            double r = (b + 0.5) * dr;
+            double gp = (sp > 0 && rp2[b] > 0 && srp > 0) ? (hp[b] / sp) / (rp2[b] / srp) : 0.0;
+            double ga = (sa > 0 && ra[b] > 0 && sra > 0) ? (ha[b] / sa) / (ra[b] / sra) : 0.0;
+            if (b < 12 || b % 3 == 0)
+                std::printf("%9.3f %14.4f %14.4f\n", r, sp > 0 ? gp : -1.0, sa > 0 ? ga : -1.0);
+        }
+        std::printf("  (-1 means that spin pairing does not occur in this system)\n");
         return 0;
     }
     if (!std::strcmp(mode, "walk")) {
