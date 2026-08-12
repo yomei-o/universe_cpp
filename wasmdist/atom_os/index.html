@@ -227,19 +227,19 @@ const SLIDERS = [
   { id:3, label:"視点の自動回転",     min:0.0, max:1.5,  step:0.05, val:0.0,   dec:2 },
   { id:7, label:"電子雲の残像",       min:0.80,max:0.995,step:0.005,val:0.965, dec:3 },
   { id:8, label:"1フレームのVMC掃引", min:1,   max:6,    step:1,    val:1,     dec:0 },
-  { id:4, label:"核の励起 E* MeV/A",  min:0.0, max:6.0,  step:0.1,  val:1.2,   dec:1 },
+  { id:4, label:"核の励起 E* MeV/A (上げると核子が速く動き軌跡が伸びる)", min:0.0, max:6.0, step:0.1, val:1.2, dec:1 },
   { id:5, label:"核の集団回転 ω",     min:0.0, max:0.03, step:0.001,val:0.0,   dec:3 },
   { id:6, label:"クォーク量子数 n",   min:1,   max:5,    step:1,    val:1,     dec:0 },
   { id:9, label:"クォークの形の揺らぎ", min:0.0, max:0.06, step:0.002,val:0.0,   dec:3 },
 ];
 const BUTTONS = [
-  { action:0, label:"表示切替 (3階層/原子/核/核子)" },
-  { action:1, label:"核の相互作用線" },
-  { action:2, label:"軌跡" },
-  { action:3, label:"陽子 / 中性子" },
-  { action:4, label:"核を再緩和" },
+  { action:0, label:"表示切替 (3階層 / 原子 / 核 / 核子)" },
+  { action:1, label:"核の相互作用線 (重なり密度)" },
+  { action:2, label:"核子とクォークの軌跡" },
+  { action:3, label:"陽子 ⇄ 中性子 (uud / udd)" },
+  { action:4, label:"核を再緩和 (別の基底状態配置)" },
   { action:5, label:"視点リセット" },
-  { action:6, label:"波動関数を再最適化 (数秒)" },
+  { action:6, label:"波動関数を再最適化 (数秒かかります)" },
 ];
 
 const $=id=>document.getElementById(id);

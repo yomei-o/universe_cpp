@@ -273,7 +273,7 @@ static const int MAXAO = 40;
 static const int MAXMO = 24;
 static const int MAXEL = 24;
 static const int MAXW  = 64;
-static const int NTRAIL = 14;
+static const int NTRAIL = 26;
 
 struct Atom { int Z, A; double R[3]; };
 
@@ -1105,6 +1105,8 @@ static int g_A = 16, g_Zn = 8;
 static double g_nE = 0.0, g_nE0 = 0.0, g_nRrms = 0.0;
 static int g_selnuc = 0;
 static double g_omega = 0.0;     // collective rotation put in at preparation
+static const int NUC_TRSTRIDE = 14;
+static int    g_nuctr = 0;
 
 struct NForce { double dR[MAXEL * 4][3]; };
 
@@ -1221,10 +1223,17 @@ static void qmd_step(double dt)
         s2 += dx * dx + dy * dy + dz * dz;
     }
     g_nRrms = std::sqrt(s2 / n);   // rms radius of the packet centroids
-    for (int i = 0; i < n; ++i) {
-        for (int t = NTRAIL - 1; t > 0; --t)
-            for (int k = 0; k < 3; ++k) g_nuc[i].tr[t][k] = g_nuc[i].tr[t - 1][k];
-        for (int k = 0; k < 3; ++k) g_nuc[i].tr[0][k] = (float)g_nuc[i].R[k];
+    // Trail sampling stride.  qmd_step runs many times per rendered frame, so
+    // recording every step gives a trail that spans a fraction of one frame and
+    // is therefore invisible.  With this stride the trail covers
+    // NTRAIL * NUC_TRSTRIDE * dt = 26 * 14 * 0.2 = 73 fm/c of real time.
+    if (++g_nuctr >= NUC_TRSTRIDE) {
+        g_nuctr = 0;
+        for (int i = 0; i < n; ++i) {
+            for (int t = NTRAIL - 1; t > 0; --t)
+                for (int k = 0; k < 3; ++k) g_nuc[i].tr[t][k] = g_nuc[i].tr[t - 1][k];
+            for (int k = 0; k < 3; ++k) g_nuc[i].tr[0][k] = (float)g_nuc[i].R[k];
+        }
     }
 }
 
@@ -1415,6 +1424,8 @@ static Quark g_q[3];
 static double g_qS[3];              // string junction
 static double g_qE = 0.0, g_qE0 = 0.0, g_qL = 0.0, g_qRrms = 0.0;
 static int    g_qIsProton = 1;
+static const int QK_TRSTRIDE = 26;   // trail sampling stride (see quark_step)
+static int    g_qtr = 0;
 
 static inline double qk_kappa() { return (2.0 / 3.0) * QK_ALPHAS * HBARC; }   // MeV fm
 
@@ -1535,9 +1546,14 @@ static void quark_step(double dt)
         s2 += dx * dx + dy * dy + dz * dz;
     }
     g_qRrms = std::sqrt(s2 / 3.0);
-    for (int i = 0; i < 3; ++i) {
-        for (int t = NTRAIL - 1; t > 0; --t) for (int k = 0; k < 3; ++k) g_q[i].tr[t][k] = g_q[i].tr[t - 1][k];
-        for (int k = 0; k < 3; ++k) g_q[i].tr[0][k] = (float)g_q[i].x[k];
+    // same stride reasoning as the nucleons: 26 * 26 * 0.0012 = 0.81 fm/c,
+    // about a third of the 2.7 fm/c orbital period
+    if (++g_qtr >= QK_TRSTRIDE) {
+        g_qtr = 0;
+        for (int i = 0; i < 3; ++i) {
+            for (int t = NTRAIL - 1; t > 0; --t) for (int k = 0; k < 3; ++k) g_q[i].tr[t][k] = g_q[i].tr[t - 1][k];
+            for (int k = 0; k < 3; ++k) g_q[i].tr[0][k] = (float)g_q[i].x[k];
+        }
     }
 }
 
@@ -2082,10 +2098,14 @@ static void draw_nucleus(Olivec_Canvas oc)
                 double r2 = d[0] * d[0] + d[1] * d[1] + d[2] * d[2];
                 double rho = pref * std::exp(-r2 / (4.0 * QL));
                 float a = (float)(rho / pref);
-                if (a < 0.22f) continue;
+                if (a < 0.16f) continue;
                 Proj p = project(g_nuc[i].R, cx, cy, sc), q = project(g_nuc[j].R, cx, cy, sc);
+                float w = (a - 0.16f) / 0.84f;
                 olivec_line(oc, (int)p.sx, (int)p.sy, (int)q.sx, (int)q.sy,
-                            rgba(90, 255, 160, 0.06f + 0.26f * (a - 0.22f) / 0.78f));
+                            rgba(90, 255, 165, 0.16f + 0.72f * w));
+                if (w > 0.45f)      // strong pairs get a thicker tube
+                    olivec_line(oc, (int)p.sx, (int)p.sy + 1, (int)q.sx, (int)q.sy + 1,
+                                rgba(140, 255, 190, 0.40f * w));
             }
     }
     // trails
@@ -2094,7 +2114,7 @@ static void draw_nucleus(Olivec_Canvas oc)
             bool pr = g_nuc[i].tau > 0;
             for (int t = 1; t < NTRAIL; ++t) {
                 Proj p = projectf(g_nuc[i].tr[t - 1], cx, cy, sc), q = projectf(g_nuc[i].tr[t], cx, cy, sc);
-                float a = 0.30f * (1.0f - (float)t / NTRAIL);
+                float a = 0.55f * (1.0f - (float)t / NTRAIL);
                 olivec_line(oc, (int)p.sx, (int)p.sy, (int)q.sx, (int)q.sy,
                             pr ? rgba(255, 110, 90, a) : rgba(110, 170, 255, a));
             }
@@ -2106,7 +2126,7 @@ static void draw_nucleus(Olivec_Canvas oc)
     for (int i = 0; i < n && i < 64; ++i)
         for (int j = i + 1; j < n && j < 64; ++j)
             if (dz[order[j]] < dz[order[i]]) std::swap(order[i], order[j]);
-    int rr = std::max(3, (int)(0.62 * sc));
+    int rr = std::max(3, (int)(0.40 * sc));
     for (int oi = 0; oi < n && oi < 64; ++oi) {
         int i = order[oi];
         Proj p = project(g_nuc[i].R, cx, cy, sc);
@@ -2123,6 +2143,7 @@ static void draw_nucleus(Olivec_Canvas oc)
     char b[112];
     int ty = R.y + 26, dyy = 12;
     uint32_t cl = rgba(140, 235, 200, 0.95f), cd = rgba(95, 165, 150, 0.9f);
+    olivec_rect(oc, R.x + 1, R.y + 22, std::min(R.w - 2, 390), 5 * dyy + 6, rgba(2, 6, 10, 0.72f));
     int Z = g_Zn, A = g_A;
     std::snprintf(b, sizeof(b), "%s-%d   %d p   %d n", ELEM[Z].sym, A, Z, A - Z);
     txt(oc, b, R.x + 8, ty, 1, cl); ty += dyy;
@@ -2170,24 +2191,33 @@ static void draw_nucleon(Olivec_Canvas oc)
         for (int i = 0; i < 3; ++i)
             for (int t = 1; t < NTRAIL; ++t) {
                 Proj p = projectf(g_q[i].tr[t - 1], cx, cy, sc), q = projectf(g_q[i].tr[t], cx, cy, sc);
-                olivec_line(oc, (int)p.sx, (int)p.sy, (int)q.sx, (int)q.sy, rgba(200, 255, 255, 0.16f * (1.0f - (float)t / NTRAIL)));
+                olivec_line(oc, (int)p.sx, (int)p.sy, (int)q.sx, (int)q.sy, rgba(210, 255, 255, 0.45f * (1.0f - (float)t / NTRAIL)));
             }
 
     static const int CC[3][3] = {{255, 80, 80}, {90, 255, 120}, {110, 150, 255}};   // colour charge
     for (int i = 0; i < 3; ++i) {
         Proj p = project(g_q[i].x, cx, cy, sc);
         int c = g_q[i].color % 3;
-        olivec_circle(oc, (int)p.sx, (int)p.sy, 11, rgba(CC[c][0], CC[c][1], CC[c][2], 0.13f));
-        olivec_circle(oc, (int)p.sx, (int)p.sy, 7, rgba(CC[c][0], CC[c][1], CC[c][2], 0.85f));
-        const char* nm = g_q[i].flavour == 0 ? "u" : "d";
-        txt(oc, nm, (int)p.sx - 3, (int)p.sy - 3, 1, rgba(10, 10, 20, 1.f));
+        bool isu = (g_q[i].flavour == 0);
+        // outer halo = colour charge, inner disc = flavour, so switching between
+        // a proton (u u d) and a neutron (u d d) is visible at a glance
+        olivec_circle(oc, (int)p.sx, (int)p.sy, 16, rgba(CC[c][0], CC[c][1], CC[c][2], 0.10f));
+        olivec_circle(oc, (int)p.sx, (int)p.sy, 12, rgba(CC[c][0], CC[c][1], CC[c][2], 0.78f));
+        olivec_circle(oc, (int)p.sx, (int)p.sy, 8,
+                      isu ? rgba(255, 250, 235, 0.96f) : rgba(38, 38, 56, 0.96f));
+        txt(oc, isu ? "u" : "d", (int)p.sx - 3, (int)p.sy - 3, 1,
+            isu ? rgba(20, 20, 30, 1.f) : rgba(240, 240, 255, 1.f));
+        const char* q = isu ? "+2/3" : "-1/3";
+        txt(oc, q, (int)p.sx - txtw(q, 1) / 2, (int)p.sy + 19, 1,
+            isu ? rgba(255, 240, 200, 0.9f) : rgba(180, 200, 255, 0.9f));
     }
 
     char b[112];
     int ty = R.y + 26, dyy = 12;
     uint32_t cl = rgba(255, 220, 140, 0.95f), cd = rgba(170, 150, 110, 0.9f);
-    std::snprintf(b, sizeof(b), "%s   %s", g_qIsProton ? "proton" : "neutron", g_qIsProton ? "u u d" : "u d d");
-    txt(oc, b, R.x + 8, ty, 1, cl); ty += dyy;
+    olivec_rect(oc, R.x + 1, R.y + 22, std::min(R.w - 2, 390), 5 * dyy + 22, rgba(2, 6, 10, 0.72f));
+    std::snprintf(b, sizeof(b), "%s  %s", g_qIsProton ? "PROTON" : "NEUTRON", g_qIsProton ? "u u d" : "u d d");
+    txt(oc, b, R.x + 8, ty, 2, cl); ty += dyy + 5;
     std::snprintf(b, sizeof(b), "mass %8.2f MeV   exp %8.2f", g_qE, g_qIsProton ? 938.272 : 939.565);
     txt(oc, b, R.x + 8, ty, 1, cd); ty += dyy;
     double v = g_qP0v / std::sqrt(g_qP0v * g_qP0v + QK_M[0] * QK_M[0]);
